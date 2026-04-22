@@ -1,0 +1,3 @@
+[submodule "thirdparty/xatlas"]
+	path = thirdparty/xatlas
+	url = https://github.com/mode777/xatlas.git
