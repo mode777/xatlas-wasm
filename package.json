@@ -1,6 +1,6 @@
 {
   "name": "xatlas-wasm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "xatlas UV atlas generation library compiled to WebAssembly",
   "type": "module",
   "main": "lib/xatlas.mjs",
@@ -23,9 +23,7 @@
     "build": "cmake --build build",
     "clean": "rimraf build dist",
     "example": "npx serve . -l 3000 --no-clipboard",
-    "test": "node test/test.mjs",
-    "prepublishOnly": "npm run build && npm test",
-    "publish": "npm publish --access public"
+    "test": "node test/test.mjs"
   },
   "keywords": [
     "xatlas",
