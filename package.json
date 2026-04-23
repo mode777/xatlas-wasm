@@ -3,26 +3,29 @@
   "version": "0.1.0",
   "description": "xatlas UV atlas generation library compiled to WebAssembly",
   "type": "module",
-  "main": "dist/xatlas.mjs",
-  "module": "dist/xatlas.mjs",
+  "main": "lib/xatlas.mjs",
+  "module": "lib/xatlas.mjs",
   "types": "lib/xatlas.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/xatlas.mjs",
+      "import": "./lib/xatlas.mjs",
       "types": "./lib/xatlas.d.ts"
     }
   },
   "files": [
     "dist/",
-    "lib/xatlas.d.ts",
-    "README.md"
+    "lib/",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "configure": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release",
     "build": "cmake --build build",
     "clean": "rimraf build dist",
     "example": "npx serve . -l 3000 --no-clipboard",
-    "test": "node test/test.mjs"
+    "test": "node test/test.mjs",
+    "prepublishOnly": "npm run build && npm test",
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "xatlas",
@@ -37,6 +40,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/mode777/xatlas-wasm.git"
   }
 }
