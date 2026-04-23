@@ -1,6 +1,6 @@
 {
   "name": "xatlas-wasm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "xatlas UV atlas generation library compiled to WebAssembly",
   "type": "module",
   "main": "lib/xatlas.mjs",
@@ -38,8 +38,16 @@
     "unwrap"
   ],
   "license": "MIT",
+  "author": "alexander.klingenbeck@gmx.de",
   "repository": {
     "type": "git",
     "url": "https://github.com/mode777/xatlas-wasm.git"
+  },
+  "homepage": "https://github.com/mode777/xatlas-wasm#readme",
+  "bugs": {
+    "url": "https://github.com/mode777/xatlas-wasm/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }

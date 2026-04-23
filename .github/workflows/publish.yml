@@ -1,0 +1,57 @@
+name: Build & Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Verify toolchain
+        run: |
+          emcc --version
+          cmake --version
+          node --version
+
+      - name: Configure WASM build
+        run: npm run configure
+
+      - name: Build WASM module
+        run: npm run build
+
+      - name: Verify dist artifacts
+        run: |
+          test -f dist/xatlas.mjs
+          test -f dist/xatlas.wasm
+          test -f lib/xatlas.mjs
+          test -f lib/xatlas.d.ts
+          echo "All expected artifacts present."
+
+      - name: Run tests
+        run: npm test
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
