@@ -36,6 +36,9 @@ jobs:
           cmake --version
           node --version
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Configure WASM build
         run: npm run configure
 
