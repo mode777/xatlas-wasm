@@ -38,7 +38,7 @@ emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-This produces `dist/xatlas.mjs` and `dist/xatlas.wasm`.
+This produces `dist/index.mjs` — a single self-contained ESM file with the WASM binary embedded as base64.
 
 ## Test
 
@@ -56,13 +56,14 @@ rm -rf build dist
 
 All of the above are also available as npm scripts:
 
-| Command            | Description                         |
-| ------------------ | ----------------------------------- |
-| `npm run configure`| Run emcmake cmake configure step    |
-| `npm run build`    | Build the WASM module               |
-| `npm test`         | Run the test suite                  |
-| `npm run clean`    | Remove build and dist directories   |
-| `npm run example`  | Serve the example app on port 3000  |
+| Command            | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `npm run configure`| Run emcmake cmake configure step               |
+| `npm run build`    | Build WASM + bundle into single ESM file       |
+| `npm run bundle`   | Bundle lib/xatlas.mjs + Emscripten glue via esbuild |
+| `npm test`         | Run the test suite                             |
+| `npm run clean`    | Remove build and dist directories              |
+| `npm run example`  | Serve the example app on port 3000             |
 
 ## Notes
 

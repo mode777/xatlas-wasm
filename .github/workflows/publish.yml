@@ -44,9 +44,7 @@ jobs:
 
       - name: Verify dist artifacts
         run: |
-          test -f dist/xatlas.mjs
-          test -f dist/xatlas.wasm
-          test -f lib/xatlas.mjs
+          test -f dist/index.mjs
           test -f lib/xatlas.d.ts
           echo "All expected artifacts present."
 

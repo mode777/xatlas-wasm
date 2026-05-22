@@ -313,13 +313,7 @@ export interface XAtlas {
 }
 
 /** Options for initializing the xatlas WASM module. */
-export interface CreateXAtlasOptions {
-  /**
-   * Override the default .wasm file location.
-   * Called by Emscripten to resolve the path to the .wasm file.
-   */
-  locateFile?: (path: string, prefix: string) => string;
-}
+export interface CreateXAtlasOptions {}
 
 /** The xatlas module API returned by initialization. */
 export interface XAtlasModule {
@@ -351,6 +345,4 @@ export interface XAtlasModule {
  * atlas.destroy();
  * ```
  */
-export default function createXAtlas(
-  options?: CreateXAtlasOptions
-): Promise<XAtlasModule>;
+export default function createXAtlas(): Promise<XAtlasModule>;

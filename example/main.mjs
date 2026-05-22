@@ -6,7 +6,7 @@
  *   - Right canvas: 2D UV chart overlay (colored per chart)
  */
 import { parseOBJ } from './obj-loader.mjs';
-import createXAtlas from '../lib/xatlas.mjs';
+import createXAtlas from '../dist/index.mjs';
 
 /* ── DOM refs ────────────────────────────────────────────────────── */
 

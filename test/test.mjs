@@ -5,7 +5,7 @@
  *
  * Run: node test/test.mjs
  */
-import createXAtlas from '../lib/xatlas.mjs';
+import createXAtlas from '../dist/index.mjs';
 
 async function main() {
   console.log('Initializing xatlas-wasm...');
