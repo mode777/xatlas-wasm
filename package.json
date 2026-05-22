@@ -21,7 +21,7 @@
   "scripts": {
     "configure": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release",
     "build": "cmake --build build && npm run bundle",
-    "bundle": "esbuild lib/xatlas.mjs --bundle --format=esm --outfile=dist/index.mjs --platform=neutral",
+    "bundle": "esbuild lib/xatlas.mjs --bundle --format=esm --outfile=dist/index.mjs --platform=node",
     "clean": "rimraf build dist",
     "example": "npx serve . -l 3000 --no-clipboard",
     "test": "node test/test.mjs"
