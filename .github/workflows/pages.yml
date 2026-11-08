@@ -1,0 +1,78 @@
+name: pages
+
+# Deploy the showcase from the exact wasm artifact the main-branch build
+# validated. The site is not part of the npm package.
+on:
+  workflow_run:
+    workflows: [Build WASM]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy showcase
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out the tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Download the tested wasm artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: xatlas-wasm-dist
+          path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install showcase dependencies
+        run: npm ci --prefix site
+
+      - name: Typecheck and test showcase
+        run: |
+          npm run check --prefix site
+          npm test --prefix site
+
+      - name: Build showcase
+        env:
+          SITE_BASE: /xatlas-wasm/
+        run: |
+          npm run build --prefix site
+          npm run build:check --prefix site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -715,6 +715,43 @@ vendoring machinery.
   archived as `openspec/changes/archive/2026-11-08-baseline-specs`.
 - **Suggested OpenSpec change:** `baseline-specs`
 
+### 5.5 Showcase
+
+#### XW-025 — Publish a showcase site
+
+- **Priority:** P2
+- **Where:** `site/`, `.github/workflows/pages.yml`,
+  `.github/workflows/build-wasm.yml`
+- **Problem:** the package has no public browser demonstration. The existing
+  `example/` is a single-page, no-build canvas demo for one OBJ: it has no
+  gallery, worker, code view, validation or deployment, so users cannot see how
+  chart and packing options change a real unwrap.
+- **Proposed:** add a separate Vite + TypeScript showcase under `site/` that
+  consumes the local package (`file:..`) and presents six scenarios (gazebo,
+  cube, UV sphere, terrain, packing lab and multi-atlas). Each scenario page
+  provides 3D, UV, Atlas and Code views, run statistics, the chart/pack recipe,
+  and OBJ/atlas-PNG downloads. A module worker owns the atlas, reports progress,
+  flattens results and destroys the atlas. Site-local Vitest unwraps every
+  scenario; a `site` job in Build WASM typechecks, tests and builds with the
+  Pages base path; `pages.yml` deploys the tested `xatlas-wasm-dist` artifact.
+  The showcase is not part of the npm tarball.
+- **Acceptance criteria:** every scenario unwraps to non-empty finite geometry
+  with UVs inside the atlas; the multi-atlas scenario produces more than one
+  sub-atlas; the production build emits a referenced hashed `xatlas.wasm`; CI
+  runs the site checks on push/PR; Pages deploys from the tested artifact.
+- **Progress (2026-11-08):** implemented by the `showcase-site` OpenSpec change.
+  Six scenarios, the four views, display modes, statistics, downloads, the
+  worker, site tests, the `site` CI job and the Pages workflow are in place.
+  Measured production output: 173,401-byte wasm (69.53 KB gzip), 573.5 KB lazy
+  demo chunk (142.9 KB gzip), 29.0 KB lazy code chunk (11.2 KB gzip). Archive
+  follows review.
+- **Follow-ups:** `showcase-gallery` (10–12 scenarios, filters, coverage,
+  option presets, chart highlighting, UV repack), `showcase-docs` (in-site
+  guides and rendered `API.md`) and `showcase-thumbnails` (captured previews).
+  File upload waits for XW-006; the stress/cancel scenario waits for XW-011 and
+  XW-014.
+- **Suggested OpenSpec change:** `showcase-site`
+
 ---
 
 ## 6. Proposed OpenSpec change sequence
@@ -727,6 +764,7 @@ refactors, and keeps each change independently reviewable.
 | 0 | `baseline-specs` | XW-024 | Current behaviour recorded as OpenSpec specs; no code changes |
 | 1 | `build-ci-hardening` | XW-015, XW-016, XW-017, XW-020 | Pinned Emscripten, push/PR build+test, package consumer test, working build scripts |
 | 2 | `wasm-loader-options` | XW-001–XW-005 | Separate `.wasm`, lazy/streaming loading, `wasmBinary`/`locateFile`, worker support, neutral bundling |
+| 2a | `showcase-site` | XW-025 | Six-scenario public gallery, worker unwrapping, 3D/UV/atlas/code views, Pages deployment (requested out of sequence) |
 | 3 | `mesh-input-validation` | XW-006, XW-014 | No silent typed-array corruption; progress cancellation covered |
 | 4 | `object-lifecycle` | XW-007, XW-013 | Idempotent release, GC safety net, no use-after-free, exception-safe allocations |
 | 5 | `atlas-result-api` | XW-008–XW-011 | Image accessor, `faceIgnoreData`, bounds checks, bulk mesh result API |
@@ -751,10 +789,14 @@ verification completed on 2026-11-08: the first `Build WASM` push run was
 green on `main` (run 42495692316) with a downloadable `xatlas-wasm-dist`
 artifact containing the build outputs and digest files; configuring the
 `build` job as a required status check is the remaining repository-settings
-follow-up. `wasm-loader-options` (XW-001–XW-005) is implemented on `main` with
-its planning artifacts complete and validated; it is pending review, CI
-verification and archive. XW-008 (`getImage()`) still needs its spec delta in
-`atlas-result-api`. Every other change in the table remains unimplemented.
+follow-up. `wasm-loader-options` (XW-001–XW-005) is implemented and archived
+(`openspec/changes/archive/2026-11-08-wasm-loader-options`, with the
+`wasm-loader`, `packaging` and `build-ci` specs synced). `showcase-site`
+(XW-025) is implemented out of sequence by the current change: the six-scenario
+gallery, worker, four views, site tests and Pages workflow are in place, and
+the package loader/API is unchanged. XW-008 (`getImage()`) still needs its spec
+delta in `atlas-result-api`. Every other change in the table remains
+unimplemented.
 
 ### Notes on ordering
 
@@ -905,8 +947,10 @@ The build still succeeds; the warning is a symptom of `--platform=node`.
   bindings for their own sake. The current small wrapper is a strength.
 - Adding pthreads/SharedArrayBuffer support in this sequence.
 - Changing xatlas's atlas-generation algorithm or output semantics.
-- Reproducing libfive's full OpenSpec/ADR/showcase apparatus. Adopt the
-  patterns that reduce risk; skip the parts that only add ceremony for a
+- Reproducing libfive's full OpenSpec/ADR/showcase apparatus. The
+  `showcase-site` change (XW-025) deliberately adds a six-scenario gallery;
+  ADRs, in-site documentation and thumbnails remain separate follow-ups. Adopt
+  the patterns that reduce risk; skip the parts that only add ceremony for a
   1,000-line wrapper.
 
 ---
@@ -935,13 +979,14 @@ AGENTS.md              repository-specific OpenSpec workflow contract
 
 `baseline-specs` is archived and `openspec validate --all --strict` passes for
 the four baseline capabilities (`wasm-loader`, `atlas-api`, `packaging`,
-`build-ci`). `build-ci-hardening` is implemented and archived;
-`wasm-loader-options` is implemented and pending review/archive, and the next
-behaviour-changing item after it is `mesh-input-validation`. XW-008 was
-delivered outside the workflow and still needs a spec delta (see §6).
-`README.md`, `API.md` and `BUILD.md` were updated to describe the separate
-`.wasm` layout and loader options and point to this backlog; they should be
-updated again as each item lands.
+`build-ci`). `build-ci-hardening` and `wasm-loader-options` are implemented and
+archived. `showcase-site` (XW-025) is implemented out of sequence and pending
+review/archive; its `showcase-site` spec delta will become the fifth capability
+when archived. The next behaviour-changing item after it remains
+`mesh-input-validation`. XW-008 was delivered outside the workflow and still
+needs a spec delta (see §6). `README.md`, `API.md`, `BUILD.md` and
+`site/README.md` describe the separate `.wasm` layout, loader options and the
+showcase; they should be updated again as each item lands.
 
 The intended workflow for each item above is:
 

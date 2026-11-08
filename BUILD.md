@@ -153,15 +153,16 @@ PowerShell/cmd has no `rm -rf`.
 
 ## Continuous integration
 
-Two GitHub Actions workflows pin the same toolchain as local builds:
+Three GitHub Actions workflows cover the build, publish and showcase deployment:
 
 | Workflow | Trigger | Behaviour |
 |---|---|---|
-| `Build WASM` (`.github/workflows/build-wasm.yml`) | pushes to `main` and all pull requests | Checks out submodules, uses Node 24, installs Emscripten 3.1.64 (asserting `emcc --version`), runs `npm ci`, configure, build, `npm test` and `npm run test:package`, then writes `dist/SHA256SUMS`/`dist/SIZES` and the job summary and uploads `dist/` as the `xatlas-wasm-dist` artifact (14-day retention). |
+| `Build WASM` (`.github/workflows/build-wasm.yml`) | pushes to `main` and all pull requests | Checks out submodules, uses Node 24, installs Emscripten 3.1.64 (asserting `emcc --version`), runs `npm ci`, configure, build, `npm test` and `npm run test:package`, then writes `dist/SHA256SUMS`/`dist/SIZES` and the job summary and uploads `dist/` as the `xatlas-wasm-dist` artifact (14-day retention). A dependent `site` job downloads that same artifact, typechecks, tests and builds the showcase with `SITE_BASE=/xatlas-wasm/`, and verifies the emitted wasm asset. |
 | `Build & Publish to npm` (`.github/workflows/publish.yml`) | published releases and `workflow_dispatch` | Runs the same pinned build and both test suites, computes the digests/sizes, generates `dist/PROVENANCE.txt` (Emscripten and Node versions, source commit, `thirdparty/xatlas` commit, digests/sizes), attaches it to the release with `gh release upload`, then runs `npm publish --provenance --access public`. |
+| `pages` (`.github/workflows/pages.yml`) | completion of a successful `Build WASM` push to `main` | Checks out the tested revision, downloads its `xatlas-wasm-dist` artifact, builds the showcase with `SITE_BASE=/xatlas-wasm/`, verifies the wasm asset, and deploys `site/dist` to GitHub Pages. Requires Pages to be enabled with the GitHub Actions source. |
 
-Both workflows use `mymindstorm/setup-emsdk@v14` with `version: 3.1.64` and fail
-before configure if `emcc` reports anything else. The publish job attaches
+Both build workflows use `mymindstorm/setup-emsdk@v14` with `version: 3.1.64`
+and fail before configure if `emcc` reports anything else. The publish job attaches
 provenance before publishing, so an upload failure prevents the release.
 
 The `build` job in `Build WASM` is intended to be a **required status check**
@@ -182,6 +183,36 @@ npm run example
 Then open <http://localhost:3000/example/>. The example loads
 `thirdparty/xatlas/models/gazebo.obj` by default and renders the input
 wireframe next to the generated UV atlas.
+
+## Showcase site
+
+The public gallery under [`site/`](site/) is a separate Vite + TypeScript
+consumer. It links the local package (`file:..`), is not part of the npm
+tarball, and requires Node.js >= 20 for its toolchain. Build the root package
+first, then:
+
+```sh
+cd site
+npm ci
+npm run dev        # http://localhost:5173/
+```
+
+Validation and production build:
+
+```sh
+npm run check
+npm test
+SITE_BASE=/xatlas-wasm/ npm run build
+SITE_BASE=/xatlas-wasm/ npm run build:check
+```
+
+`build:check` fails if the output does not contain a referenced `.wasm` asset.
+The `site` job in `Build WASM` runs the same typecheck, tests and build on every
+push and pull request. `.github/workflows/pages.yml` deploys the tested artifact
+to <https://mode777.github.io/xatlas-wasm/> after a successful `main` run; the
+repository must have Pages enabled with the **GitHub Actions** source. See
+[`site/README.md`](site/README.md) for the scenario contract and deployment
+details.
 
 ## OpenSpec workflow
 

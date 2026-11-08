@@ -14,6 +14,15 @@ and workers. Known limitations and the remaining API improvements are tracked
 in the
 [improvement backlog](https://github.com/mode777/xatlas-wasm/blob/main/docs/improvements.md).
 
+## Showcase
+
+A live gallery of six unwrapping scenarios is at
+<https://mode777.github.io/xatlas-wasm/>. It shows the chart layout, atlas
+texel map, packing statistics and the exact source for each scenario, all
+running the real WebAssembly build in a worker. The site lives under
+[`site/`](https://github.com/mode777/xatlas-wasm/tree/main/site) as a separate
+consumer and is **not** part of the npm package.
+
 ## Install
 
 ```sh
@@ -139,8 +148,9 @@ The worker test in `test/worker-entry.mjs` follows the Node recipe.
 
 ## Documentation
 
+- **[Showcase](https://mode777.github.io/xatlas-wasm/)** — the six-scenario browser gallery.
 - **[API Reference](https://github.com/mode777/xatlas-wasm/blob/main/API.md)** — types, options, enumerations and examples.
-- **[Build Guide](https://github.com/mode777/xatlas-wasm/blob/main/BUILD.md)** — compiling and testing the WASM module.
+- **[Build Guide](https://github.com/mode777/xatlas-wasm/blob/main/BUILD.md)** — compiling, testing and serving the WASM module and showcase.
 - **[Improvement Backlog](https://github.com/mode777/xatlas-wasm/blob/main/docs/improvements.md)** — WASM loading audit, comparison with libfive-wasm, and the proposed OpenSpec change sequence.
 - **[OpenSpec Project](https://github.com/mode777/xatlas-wasm/tree/main/openspec)** — project context, specs, and active change proposals.
 

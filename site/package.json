@@ -1,0 +1,31 @@
+{
+  "name": "xatlas-wasm-showcase",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Public showcase for xatlas-wasm (not part of the npm package).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:check": "node scripts/check-build.mjs",
+    "preview": "vite preview",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "highlight.js": "^11.12.0",
+    "three": "^0.187.0",
+    "xatlas-wasm": "file:.."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/three": "^0.187.0",
+    "happy-dom": "^21.0.4",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5",
+    "vitest": "^5.1.0"
+  }
+}
