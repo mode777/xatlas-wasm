@@ -703,7 +703,9 @@ That change is therefore only partially delivered: the image accessor exists,
 but the archived `atlas-api` baseline still says no image accessor exists, and
 XW-009–XW-011 (`faceIgnoreData`, bounds-checked result handles, bulk mesh
 result API) remain. `build-ci-hardening` (XW-015, XW-016, XW-017 and partial
-XW-020) is implemented on `main` and pending archive: both workflows pin
+XW-020) is implemented on `main` and archived
+(`openspec/changes/archive/2026-11-08-build-ci-hardening`, with the `build-ci`
+spec synced): both workflows pin
 Emscripten 3.1.64, push/PR build-and-test CI runs the package consumer test,
 and the build scripts and smoke-test preflight are fixed. Its GitHub-side
 verification completed on 2026-11-08: the first `Build WASM` push run was
@@ -891,7 +893,7 @@ AGENTS.md              repository-specific OpenSpec workflow contract
 
 `baseline-specs` is archived and `openspec validate --all --strict` passes for
 the four baseline capabilities (`wasm-loader`, `atlas-api`, `packaging`,
-`build-ci`). `build-ci-hardening` is implemented and pending archive; the next
+`build-ci`). `build-ci-hardening` is implemented and archived; the next
 behaviour-changing item is `wasm-loader-options`. XW-008 was delivered outside
 the workflow and still needs a spec delta (see §6).
 `README.md`, `API.md` and `BUILD.md` were updated to describe the current

@@ -62,12 +62,11 @@ progress callback, call `generate()`, and assert that `width`, `height`,
 
 `.github/workflows/publish.yml` SHALL run on a published GitHub release and on
 manual `workflow_dispatch`. It SHALL check out submodules, use Node.js 24,
-install Emscripten `3.1.64` with `mymindstorm/setup-emsdk@v14`, verify that the
-installed `emcc` reports exactly `3.1.64`, run `npm ci`, `npm run configure`,
-`npm run build`, verify `dist/index.mjs` and `lib/xatlas.d.ts`, run `npm test`
-and `npm run test:package`, compute and log the digest and size of the emitted
-artifacts, record build provenance, and publish with
-`npm publish --provenance --access public` using `id-token: write`.
+install Emscripten `3.1.64` and verify the installed `emcc` reports exactly
+`3.1.64`, run the full build, smoke test and packed-package consumer test,
+verify `dist/index.mjs` and `lib/xatlas.d.ts`, record artifact digests and
+build provenance, and publish with `npm publish --provenance --access public`
+using `id-token: write`.
 
 #### Scenario: Published release produces an npm release
 
