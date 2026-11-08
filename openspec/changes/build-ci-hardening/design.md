@@ -122,6 +122,10 @@ the auto-configure behaviour.
   and exits with the child's status. Alternative: a shell condition inside the
   `build` script; rejected because quoting/`[ -f ]` is less portable and harder
   to test than a small Node script. `npm run configure` remains a public step.
+  Implementation note: `ensure-configured.mjs` also creates `dist/` when it is
+  absent — CMake creates the directory at configure time but `em++` fails on a
+  later build if only `dist/` was deleted, so the mkdir keeps
+  `rm -rf dist && npm run build` working against a warm `build/` tree.
 - **Test preflight:** `test/test.mjs` checks
   `existsSync(new URL('../dist/index.mjs', import.meta.url))` before importing,
   prints `dist/index.mjs not found. Run "npm run build" first.` to stderr and

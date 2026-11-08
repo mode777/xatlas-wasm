@@ -20,14 +20,18 @@
   ],
   "scripts": {
     "configure": "emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release",
+    "prebuild": "node scripts/ensure-configured.mjs",
     "build": "cmake --build build && npm run bundle",
     "bundle": "esbuild lib/xatlas.mjs --bundle --format=esm --outfile=dist/index.mjs --platform=node",
-    "clean": "rimraf build dist",
+    "clean": "rm -rf build dist",
     "example": "npx serve . -l 3000 --no-clipboard",
-    "test": "node test/test.mjs"
+    "test": "node test/test.mjs",
+    "test:package": "node scripts/test-package.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.21.5"
+    "esbuild": "^0.21.5",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5"
   },
   "keywords": [
     "xatlas",

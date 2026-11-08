@@ -472,6 +472,17 @@ vendoring machinery.
   record.
 - **Acceptance criteria:** a different Emscripten version fails the build;
   every build logs the digest/size; the release process records them.
+- **Progress (2026-11-08):** implemented by the `build-ci-hardening` OpenSpec
+  change. Both workflows install Emscripten 3.1.64 through
+  `mymindstorm/setup-emsdk@v14` and assert `emcc --version` before building, so
+  an unpinned or cached SDK fails before configure. The build and publish jobs
+  write `dist/SHA256SUMS`/`dist/SIZES` for `dist/xatlas.mjs` and
+  `dist/index.mjs`, print the same rows to the job summary, and the release
+  job generates and attaches `dist/PROVENANCE.txt` (Emscripten, Node, source
+  commit, `thirdparty/xatlas` commit, digests/sizes) before `npm publish`.
+  `BUILD.md` documents the 3.1.64 pin. Remaining: a committed submodule
+  lock/README is deferred to XW-022; tag/version enforcement, trusted
+  publishing and a changelog to XW-019.
 - **Suggested OpenSpec change:** `build-ci-hardening`
 
 #### XW-016 — Add a push/PR build-and-test workflow
@@ -486,6 +497,15 @@ vendoring machinery.
   Optionally add a headless browser smoke test for the example.
 - **Acceptance criteria:** a failing build/test blocks a PR; the workflow is
   green on `main`; the artifact is downloadable from the run.
+- **Progress (2026-11-08):** implemented by the `build-ci-hardening` OpenSpec
+  change. `.github/workflows/build-wasm.yml` (`Build WASM`) runs on pushes to
+  `main` and on pull requests, checks out submodules, uses Node 24, installs
+  pinned Emscripten 3.1.64 with a version assertion, and runs `npm ci`,
+  configure, build, `npm test`, `npm run test:package` and the digest step
+  before uploading `dist/` as the `xatlas-wasm-dist` artifact (14-day
+  retention). Making the `build` job a required status check is a GitHub
+  branch-protection setting, not a repository file; the first green GitHub run
+  and that configuration are tracked by the change's task 5.4.
 - **Suggested OpenSpec change:** `build-ci-hardening`
 
 #### XW-017 — Fix build ergonomics and the clean script
@@ -501,6 +521,14 @@ vendoring machinery.
   `build/` is absent; add a friendly preflight message to the test script.
 - **Acceptance criteria:** a fresh clone can run configure/build/test/clean
   successfully; `npm run clean` exits 0.
+- **Progress (2026-11-08):** implemented by the `build-ci-hardening` OpenSpec
+  change. `clean` is now `rm -rf build dist` (no undeclared `rimraf`), so it
+  needs a Unix-like shell — Git Bash/WSL on Windows, documented in `BUILD.md`.
+  `prebuild` runs `scripts/ensure-configured.mjs`, which ensures `dist/` exists
+  and configures CMake when `build/CMakeCache.txt` is absent, so a fresh or
+  cleaned checkout builds with `npm run build` alone. `test/test.mjs` checks
+  for `dist/index.mjs` and prints
+  `dist/index.mjs not found. Run "npm run build" first.` before exiting 1.
 - **Suggested OpenSpec change:** `build-ci-hardening`
 
 #### XW-018 — Fix package contents and manifest hygiene
@@ -551,6 +579,22 @@ vendoring machinery.
   XW-001 lands). Model it on `libfive-wasm/scripts/test-package.mjs`.
 - **Acceptance criteria:** the script passes locally and in CI; it fails on a
   missing `.wasm`, missing license, or a broken declaration.
+- **Progress (2026-11-08):** **partially implemented** by the
+  `build-ci-hardening` OpenSpec change. `npm run test:package` runs
+  `scripts/test-package.mjs`: it packs the real tarball, checks the required
+  `dist/index.mjs`, `lib/xatlas.d.ts`, `README.md` and `package.json` entries,
+  installs the tarball into a scratch project under `os.tmpdir()`, runs a Node
+  consumer (quad, `generate()`, `getImage()`, `destroy()`), typechecks a
+  TypeScript consumer with the repository's `typescript`, and runs a Vite
+  production build that must emit and reference a JS asset. The scratch tree
+  is removed on success and kept on failure; `KEEP_PACKAGE_TEST=1` keeps it
+  after success, and `TEST_PACKAGE_DROP=<file>` is a local negative hook (not
+  used in CI). The missing-`.wasm` acceptance check is deferred to XW-001: the
+  current `SINGLE_FILE=1` package has no separate asset, and the consumer test
+  intentionally does not expect one. The missing-license check is deferred to
+  XW-018: the tarball still has no root `LICENSE`. Remaining sub-items:
+  XW-018 package contents, XW-019 release flow, XW-022 lock/provenance,
+  XW-001 `.wasm`.
 - **Suggested OpenSpec change:** `build-ci-hardening` (or
   `package-release-polish`)
 
@@ -654,7 +698,13 @@ verified outside OpenSpec before the `atlas-result-api` change was authored.
 That change is therefore only partially delivered: the image accessor exists,
 but the archived `atlas-api` baseline still says no image accessor exists, and
 XW-009–XW-011 (`faceIgnoreData`, bounds-checked result handles, bulk mesh
-result API) remain. Every other change in the table is unimplemented.
+result API) remain. `build-ci-hardening` (XW-015, XW-016, XW-017 and partial
+XW-020) is implemented on `main` and pending archive: both workflows pin
+Emscripten 3.1.64, push/PR build-and-test CI runs the package consumer test,
+and the build scripts and smoke-test preflight are fixed. Its GitHub-side
+verification — the first green `Build WASM` run and configuring the `build`
+job as a required status check — is tracked by the change's task 5.4. Every
+other change in the table remains unimplemented.
 
 ### Notes on ordering
 
@@ -835,8 +885,9 @@ AGENTS.md              repository-specific OpenSpec workflow contract
 
 `baseline-specs` is archived and `openspec validate --all --strict` passes for
 the four baseline capabilities (`wasm-loader`, `atlas-api`, `packaging`,
-`build-ci`). The next behaviour-changing item is `build-ci-hardening`; XW-008
-was delivered outside the workflow and still needs a spec delta (see §6).
+`build-ci`). `build-ci-hardening` is implemented and pending archive; the next
+behaviour-changing item is `wasm-loader-options`. XW-008 was delivered outside
+the workflow and still needs a spec delta (see §6).
 `README.md`, `API.md` and `BUILD.md` were updated to describe the current
 `0.1.3` behaviour and point to this backlog; they should be updated again as
 each item lands.

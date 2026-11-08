@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -28,7 +28,10 @@ jobs:
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: latest
+          version: 3.1.64
+
+      - name: Verify Emscripten version
+        run: emcc --version | head -n 1 | grep -F '3.1.64'
 
       - name: Verify toolchain
         run: |
@@ -53,6 +56,61 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Run packed-package consumer test
+        run: npm run test:package
+
+      - name: Compute artifact digests and sizes
+        run: |
+          set -euo pipefail
+          rm -f dist/SHA256SUMS dist/SIZES
+          files=(dist/xatlas.mjs dist/index.mjs)
+          for f in "${files[@]}"; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Expected artifact '$f' is missing or empty"
+              exit 1
+            fi
+          done
+          {
+            echo "| Artifact | SHA-256 | Size |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for f in "${files[@]}"; do
+            sha256sum "$f" | tee -a dist/SHA256SUMS
+            stat -c '%n %s bytes' "$f" | tee -a dist/SIZES
+            digest=$(sha256sum "$f" | cut -d ' ' -f 1)
+            size=$(stat -c '%s' "$f")
+            echo "| \`$f\` | \`$digest\` | $size bytes |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Generate release provenance
+        run: |
+          set -euo pipefail
+          {
+            echo "Emscripten: $(emcc --version | head -n 1)"
+            echo "Node.js: $(node --version)"
+            echo "Source commit: $GITHUB_SHA"
+            echo "thirdparty/xatlas commit: $(git -C thirdparty/xatlas rev-parse HEAD)"
+            echo ""
+            echo "SHA-256:"
+            cat dist/SHA256SUMS
+            echo ""
+            echo "Sizes:"
+            cat dist/SIZES
+          } > dist/PROVENANCE.txt
+          cat dist/PROVENANCE.txt
+          {
+            echo "### Release provenance"
+            echo ""
+            echo '```'
+            cat dist/PROVENANCE.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach provenance to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/PROVENANCE.txt --clobber
 
       - name: Publish to npm
         run: npm publish --provenance --access public

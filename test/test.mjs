@@ -5,7 +5,14 @@
  *
  * Run: node test/test.mjs
  */
-import createXAtlas from '../dist/index.mjs';
+import { existsSync } from 'node:fs';
+
+const entry = new URL('../dist/index.mjs', import.meta.url);
+if (!existsSync(entry)) {
+  console.error('dist/index.mjs not found. Run "npm run build" first.');
+  process.exit(1);
+}
+const { default: createXAtlas } = await import(entry.href);
 
 async function main() {
   console.log('Initializing xatlas-wasm...');

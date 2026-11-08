@@ -75,13 +75,34 @@ planned in the improvement backlog.
 
 ## Development
 
+Local builds use **Emscripten 3.1.64**, the same version both CI workflows pin.
+
 ```sh
-source ../emsdk/emsdk_env.sh   # target Emscripten 3.1.64
+source ../emsdk/emsdk_env.sh   # activate the 3.1.64 emsdk
 npm ci
-npm run configure
-npm run build
-npm test
+npm run build                  # configures automatically when build/ is absent
+npm test                       # Node smoke test
+npm run test:package           # packed-tarball consumer test
 ```
+
+`npm run build` runs `npm run configure` automatically when
+`build/CMakeCache.txt` is missing. `npm run clean` removes `build/` and `dist/`
+with `rm -rf`, so it needs a Unix-like shell (Linux or macOS, or Git Bash/WSL
+on Windows). `npm test` prints a build hint naming `npm run build` when
+`dist/index.mjs` is missing.
+
+`npm run test:package` packs the real tarball, installs it into a scratch
+project under the OS temp directory, runs a Node consumer (including
+`getImage()`), typechecks a TypeScript consumer and builds a Vite consumer.
+The scratch tree is kept on failure; `KEEP_PACKAGE_TEST=1` keeps it after a
+successful run, and `TEST_PACKAGE_DROP=<file>` is a maintainer-only hook for
+proving a deliberately broken package fails (not used in CI). The test
+intentionally does not expect a separate `.wasm` asset (`SINGLE_FILE=1` today;
+XW-001) and does not require a root `LICENSE` yet (XW-018).
+
+CI runs the same build, smoke test and consumer test on every push to `main`
+and every pull request, with Emscripten 3.1.64 and Node 24; see the
+[Build Guide](https://github.com/mode777/xatlas-wasm/blob/main/BUILD.md#continuous-integration).
 
 Functional work is planned and implemented through OpenSpec changes under
 `openspec/changes/`; see [AGENTS.md](https://github.com/mode777/xatlas-wasm/blob/main/AGENTS.md) for the repository workflow and
