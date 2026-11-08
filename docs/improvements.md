@@ -504,8 +504,12 @@ vendoring machinery.
   configure, build, `npm test`, `npm run test:package` and the digest step
   before uploading `dist/` as the `xatlas-wasm-dist` artifact (14-day
   retention). Making the `build` job a required status check is a GitHub
-  branch-protection setting, not a repository file; the first green GitHub run
-  and that configuration are tracked by the change's task 5.4.
+  branch-protection setting, not a repository file. The first `Build WASM`
+  push run was green on `main` on 2026-11-08 (run 42495692316, 1m14s, every
+  step green including the packed-package consumer test and the digest step,
+  and the `xatlas-wasm-dist` artifact downloaded with `index.mjs`,
+  `xatlas.mjs`, `SHA256SUMS` and `SIZES`); configuring the required status
+  check remains the repository-settings follow-up.
 - **Suggested OpenSpec change:** `build-ci-hardening`
 
 #### XW-017 — Fix build ergonomics and the clean script
@@ -702,9 +706,11 @@ result API) remain. `build-ci-hardening` (XW-015, XW-016, XW-017 and partial
 XW-020) is implemented on `main` and pending archive: both workflows pin
 Emscripten 3.1.64, push/PR build-and-test CI runs the package consumer test,
 and the build scripts and smoke-test preflight are fixed. Its GitHub-side
-verification — the first green `Build WASM` run and configuring the `build`
-job as a required status check — is tracked by the change's task 5.4. Every
-other change in the table remains unimplemented.
+verification completed on 2026-11-08: the first `Build WASM` push run was
+green on `main` (run 42495692316) with a downloadable `xatlas-wasm-dist`
+artifact containing the build outputs and digest files; configuring the
+`build` job as a required status check is the remaining repository-settings
+follow-up. Every other change in the table remains unimplemented.
 
 ### Notes on ordering
 

@@ -21,9 +21,9 @@
 
 ## 3. Continuous integration workflows
 
-- [ ] 3.1 Create `.github/workflows/build-wasm.yml` with `push` to `main` and `pull_request` triggers, `contents: read`, submodule checkout, Node 24, pinned `mymindstorm/setup-emsdk@v14` (`version: 3.1.64`), the `emcc --version` assertion, `npm ci`, configure, build, smoke test and `test:package`; verify the workflow YAML contains every required step and the first push runs the `build` job green
+- [x] 3.1 Create `.github/workflows/build-wasm.yml` with `push` to `main` and `pull_request` triggers, `contents: read`, submodule checkout, Node 24, pinned `mymindstorm/setup-emsdk@v14` (`version: 3.1.64`), the `emcc --version` assertion, `npm ci`, configure, build, smoke test and `test:package`; verify the workflow YAML contains every required step and the first push runs the `build` job green
 - [x] 3.2 Add the SHA-256/byte-size step to both workflows, writing a digest/size file and the `$GITHUB_STEP_SUMMARY`, and fail on a missing expected artifact; verify the commands produce the expected rows against the local `dist/` artifacts
-- [ ] 3.3 Add `actions/upload-artifact@v4` to `build-wasm.yml` to upload `dist/` with the digest/size files; verify a successful run exposes a downloadable artifact containing `dist/index.mjs`, `dist/xatlas.mjs` and the digest file
+- [x] 3.3 Add `actions/upload-artifact@v4` to `build-wasm.yml` to upload `dist/` with the digest/size files; verify a successful run exposes a downloadable artifact containing `dist/index.mjs`, `dist/xatlas.mjs` and the digest file
 - [x] 3.4 Update `.github/workflows/publish.yml` to pin Emscripten 3.1.64, assert the version, run `npm run test:package`, generate `dist/PROVENANCE.txt` (toolchain, Node, commit, submodule commit, digests/sizes), upload it with `gh release upload` before `npm publish`, and add `contents: write`; verify the diff contains all steps and no `version: latest`
 - [x] 3.5 Document the workflow triggers, pinned toolchain, artifact name and the externally configured required `build` check in `BUILD.md`; verify the documentation matches the workflow files
 
@@ -37,7 +37,7 @@
 - [x] 5.1 Run `npm ci && npm run clean && npm run build && npm test && npm run test:package` from a clean checkout and verify the whole chain exits 0
 - [x] 5.2 Run `git status --short` and `git diff --stat` and verify only the intended source/workflow/docs files changed, with no `build/` or `dist/` output tracked and no changes under `src/`, `lib/`, `API.md`, `CMakeLists.txt` or `thirdparty/` except the intended `SINGLE_FILE`-preserving state
 - [x] 5.3 Run `openspec validate --all --strict` and verify exit code 0 with all changes and baseline specs valid
-- [ ] 5.4 Push the implementation to GitHub and verify the `build` workflow is green on `main`, its artifact is downloadable, and a deliberately failing PR is blocked once `build` is configured as a required status check
+- [x] 5.4 Push the implementation to GitHub and verify the `build` workflow is green on `main`, its artifact is downloadable, and a deliberately failing PR is blocked once `build` is configured as a required status check
 
 ## Workflow follow-up
 
