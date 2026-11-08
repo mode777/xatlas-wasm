@@ -1,5 +1,11 @@
 # Plan: Fix browser compatibility of xatlas.mjs
 
+> **Historical note (2026-11-08):** This plan predates the current build and
+> references code that has since changed. It is kept for history; the current
+> loader/bundling work is tracked in
+> [`docs/improvements.md`](../../docs/improvements.md) (XW-001–XW-004) and the
+> OpenSpec backlog.
+
 **TL;DR:** Remove unconditional Node.js imports and use dynamic imports + environment detection so the module loads cleanly in both Node.js and browsers.
 
 **Steps**

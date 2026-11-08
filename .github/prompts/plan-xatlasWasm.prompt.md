@@ -1,5 +1,9 @@
 # Plan: xatlas-wasm — Port xatlas to WebAssembly npm package
 
+> **Historical note (2026-11-08):** This is the original planning document. It
+> is kept for history and is superseded by
+> [`docs/improvements.md`](../../docs/improvements.md) and the OpenSpec backlog.
+
 ## TL;DR
 Port the xatlas C++ atlas generation library to WebAssembly using Emscripten + CMake, expose it via its existing C API, and wrap it in an ergonomic JavaScript module with TypeScript definitions, packaged as an npm module (`xatlas-wasm`).
 
