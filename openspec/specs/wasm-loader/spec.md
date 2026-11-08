@@ -7,54 +7,93 @@ package and how consumers initialize the module in Node.js and browsers.
 
 ## Requirements
 
-### Requirement: Single-file embedded WASM artifact
+### Requirement: Separate WASM artifact loaded on demand
 
-The package SHALL deliver the WebAssembly binary inside the JavaScript module
-as an embedded base64 payload. No separate `.wasm` file SHALL be published, and
-initialization SHALL NOT fetch, stream or read a standalone WASM asset.
+The package SHALL publish a standalone `xatlas.wasm` artifact and resolve it
+beside the package entry with the module URL by default. The JavaScript bundle
+SHALL NOT contain an embedded base64 WASM payload, and the artifact SHALL be
+loaded only when `createXAtlas()` is called.
 
-#### Scenario: Node consumer initializes without a WASM asset
+#### Scenario: Build emits a standalone artifact
 
-- **WHEN** a Node.js process imports the package and awaits `createXAtlas()`
-- **THEN** the module initializes from the embedded payload and no `.wasm` file is read from disk or the network
+- **WHEN** `npm run build` completes
+- **THEN** `dist/xatlas.wasm`, `dist/xatlas.mjs` and `dist/index.mjs` exist, and `dist/index.mjs` contains no base64 WASM payload
 
-#### Scenario: Build output contains no standalone WASM artifact
+#### Scenario: Node loads the sibling artifact
 
-- **WHEN** a consumer inspects the built `dist/` directory
-- **THEN** it contains `xatlas.mjs` and `index.mjs` and no `xatlas.wasm`
+- **WHEN** a Node.js process imports the package and awaits `createXAtlas()` with no options
+- **THEN** it reads `xatlas.wasm` beside `dist/index.mjs` and resolves to a working module
 
-#### Scenario: No streaming compilation path exists
+#### Scenario: Browser requests the artifact over HTTP
 
-- **WHEN** the module instantiates the binary
-- **THEN** it uses the decoded embedded buffer because a data URI cannot be passed to `WebAssembly.instantiateStreaming()`
+- **WHEN** a browser loads the package from a normal HTTP origin
+- **THEN** initialization requests the sibling `xatlas.wasm` instead of decoding an embedded payload
 
-### Requirement: Asynchronous no-argument module factory
+### Requirement: Asynchronous module factory with loader options
 
-The package's default export SHALL be an async function `createXAtlas()` that
-takes no parameters and resolves to the module object. The factory SHALL
-initialize a module backed by the embedded binary.
+The default export SHALL be an async `createXAtlas(options?)` that resolves to
+the module object. It SHALL accept `wasmBinary` (ArrayBuffer or
+ArrayBufferView), `locateFile` (a function mapping artifact path and prefix to
+a URL), and `print`/`printErr` (functions receiving text). No options SHALL
+mean default sibling resolution.
 
 #### Scenario: Factory called with no arguments
 
 - **WHEN** a consumer awaits `createXAtlas()`
-- **THEN** it resolves to an object exposing `createAtlas()`, `addMeshErrorString()`, `progressCategoryString()` and the enum constants
+- **THEN** it resolves to an object exposing the existing factory methods and enum constants
 
-### Requirement: Loader arguments are ignored
+#### Scenario: Factory accepts all loader options
 
-`createXAtlas()` SHALL accept no loader options. Any argument passed at runtime
-SHALL be ignored, and no argument SHALL alter WASM resolution or
-instantiation. `locateFile` and `wasmBinary` are not part of the baseline
-contract.
+- **WHEN** a consumer calls `createXAtlas({ wasmBinary, locateFile, print, printErr })` with correctly typed values
+- **THEN** initialization succeeds without error
 
-#### Scenario: Options object has no effect
+### Requirement: Loader option validation
 
-- **WHEN** a consumer calls `createXAtlas({ locateFile: () => '/custom/xatlas.wasm' })` or passes `wasmBinary`
-- **THEN** initialization still uses the embedded payload and the options are silently ignored
+Before instantiating the module, `createXAtlas()` SHALL reject with a
+`TypeError` naming the offending option when `wasmBinary` is not an
+ArrayBuffer or ArrayBufferView, or when `locateFile`, `print` or `printErr` is
+not a function.
 
-#### Scenario: TypeScript rejects an options argument
+#### Scenario: Invalid wasmBinary is rejected
 
-- **WHEN** a TypeScript consumer calls `createXAtlas({})` against the package's type declarations
-- **THEN** the compiler reports `TS2554: Expected 0 arguments, but got 1`
+- **WHEN** `createXAtlas({ wasmBinary: 'not-bytes' })` is called
+- **THEN** the promise rejects with a `TypeError` naming `wasmBinary` and no module is instantiated
+
+#### Scenario: Invalid locateFile is rejected
+
+- **WHEN** `createXAtlas({ locateFile: '/xatlas.wasm' })` is called
+- **THEN** the promise rejects with a `TypeError` naming `locateFile`
+
+#### Scenario: Invalid logging callback is rejected
+
+- **WHEN** `createXAtlas({ print: 'console.log' })` is called
+- **THEN** the promise rejects with a `TypeError` naming `print`
+
+### Requirement: WASM binary precedence over URL resolution
+
+When `wasmBinary` is supplied, the factory SHALL instantiate from those bytes
+and SHALL NOT invoke `locateFile`, even when both options are present.
+
+#### Scenario: Explicit bytes win over a locator
+
+- **WHEN** `createXAtlas` receives valid `wasmBinary` bytes and a `locateFile` that would throw
+- **THEN** initialization succeeds from the bytes and the locator is not called
+
+#### Scenario: Custom locator resolves the artifact
+
+- **WHEN** `createXAtlas({ locateFile })` is called without `wasmBinary`
+- **THEN** `locateFile` is called with the artifact filename and prefix, and initialization uses the returned URL
+
+### Requirement: Missing WASM artifact fails initialization
+
+If the resolved artifact cannot be read or fetched, `createXAtlas()` SHALL
+reject with an `Error` that names `xatlas.wasm` and preserves the underlying
+cause. It SHALL NOT fall back to embedded WASM data.
+
+#### Scenario: Missing sibling artifact is reported
+
+- **WHEN** the package entry is loaded without a sibling `xatlas.wasm`
+- **THEN** `createXAtlas()` rejects with an error naming `xatlas.wasm` and no module is returned
 
 ### Requirement: Module exports and enumerations
 
@@ -67,18 +106,19 @@ The resolved module SHALL expose `createAtlas`, `addMeshErrorString`,
 - **WHEN** a consumer accesses `xatlas.AddMeshError.InvalidIndexCount` and `xatlas.ProgressCategory.BuildOutputMeshes`
 - **THEN** they are the numbers `4` and `3` respectively
 
-### Requirement: Browser and Node runtime targets
+### Requirement: Browser, Node and Worker runtime targets
 
-The module SHALL be built for the `web` and `node` Emscripten environments and
-SHALL load as an ES module in Node.js >= 16 and current browsers. It SHALL NOT
-require server MIME configuration or bundler asset rules to initialize.
+The module SHALL be built for the `web`, `node` and `worker` Emscripten
+environments and load as an ES module in Node.js >= 16, current browsers and
+Web Workers. It SHALL NOT require pthreads, SharedArrayBuffer or cross-origin
+isolation.
 
-#### Scenario: Browser import needs no asset configuration
+#### Scenario: Node worker generates an atlas
 
-- **WHEN** a browser loads the package through an ES module import
-- **THEN** the module initializes without requesting a `.wasm` URL and without a MIME-type requirement
+- **WHEN** the built package is loaded inside a Node worker thread
+- **THEN** it initializes, generates an atlas for a four-vertex quad, and reports non-zero dimensions and mesh counts
 
-#### Scenario: Worker environments are not compiled in
+#### Scenario: Worker build needs no cross-origin isolation
 
-- **WHEN** a consumer attempts to initialize the package inside a Web Worker on this baseline
-- **THEN** worker support is absent because the build targets only `web` and `node`
+- **WHEN** the module runs in a worker without COOP/COEP headers
+- **THEN** initialization and atlas generation work because the kernel remains single-threaded

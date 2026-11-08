@@ -27,34 +27,45 @@ SHALL NOT provide a CommonJS build or a `require` export condition.
 
 The package SHALL publish `lib/xatlas.d.ts`, referenced by the `types` field
 and by the `types` condition of the `exports` map. The declarations SHALL
-describe the default export as `createXAtlas(): Promise<XAtlasModule>`.
+describe the default export as
+`createXAtlas(options?: CreateXAtlasOptions): Promise<XAtlasModule>` with
+`wasmBinary`, `locateFile`, `print` and `printErr` options.
 
 #### Scenario: TypeScript resolves the declarations
 
 - **WHEN** a TypeScript consumer imports the package with `moduleResolution` set to `node16` or `bundler`
-- **THEN** the compiler loads `lib/xatlas.d.ts` and types the default export as a zero-argument async factory
+- **THEN** the compiler loads `lib/xatlas.d.ts` and types the default export as an async factory accepting optional loader options
+
+#### Scenario: TypeScript accepts loader options
+
+- **WHEN** a TypeScript consumer calls `createXAtlas({ wasmBinary: new Uint8Array(), locateFile: (path) => path, print: () => {}, printErr: () => {} })`
+- **THEN** the compiler accepts the call
+
+#### Scenario: TypeScript rejects a mistyped option
+
+- **WHEN** a TypeScript consumer calls `createXAtlas({ wasmBinary: 'bytes' })`
+- **THEN** the compiler reports a type error for `wasmBinary`
 
 ### Requirement: Declared package file allow-list
 
-The `files` field SHALL list `dist/index.mjs`, `lib/xatlas.d.ts`, `README.md`
-and `LICENSE`.
+The `files` field SHALL list `dist/index.mjs`, `dist/xatlas.wasm`,
+`lib/xatlas.d.ts`, `README.md` and `LICENSE`.
 
 #### Scenario: Manifest declares the intended file set
 
 - **WHEN** a consumer reads `package.json`
-- **THEN** `files` contains exactly `dist/index.mjs`, `lib/xatlas.d.ts`, `README.md` and `LICENSE`
+- **THEN** `files` contains exactly `dist/index.mjs`, `dist/xatlas.wasm`, `lib/xatlas.d.ts`, `README.md` and `LICENSE`
 
-### Requirement: Actual tarball contents omit the license
+### Requirement: Actual tarball contents include the WASM asset
 
-The published tarball SHALL contain only the files that exist and match the
-allow-list. Because no root `LICENSE` file exists in the repository, the
-tarball SHALL contain four files and SHALL NOT contain license text, `API.md`
-or `BUILD.md`.
+The published tarball SHALL contain `dist/index.mjs`, `dist/xatlas.wasm`,
+`lib/xatlas.d.ts`, `README.md` and `package.json`. Because no root `LICENSE`
+file exists, it SHALL NOT contain license text, `API.md` or `BUILD.md`.
 
 #### Scenario: npm pack lists the shipped files
 
 - **WHEN** `npm pack --dry-run` runs on the repository
-- **THEN** the tarball lists `README.md`, `dist/index.mjs`, `lib/xatlas.d.ts` and `package.json`, totalling four files, and no `LICENSE`
+- **THEN** the tarball lists `README.md`, `dist/index.mjs`, `dist/xatlas.wasm`, `lib/xatlas.d.ts` and `package.json`, and no `LICENSE`
 
 ### Requirement: Zero runtime dependencies
 

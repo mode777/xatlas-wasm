@@ -28,9 +28,8 @@ embed the binary in the JavaScript.
 `build` SHALL configure automatically when no configured `build/` directory
 exists, then run `cmake --build build` followed by `bundle`. `bundle` SHALL run
 esbuild on the JavaScript wrapper into `dist/index.mjs` with the neutral
-platform and `module`, `fs`, `path` and `url` as externals. `clean` SHALL
-remove `build/` and `dist/` and exit `0` without requiring a `rimraf`
-dependency. `test` SHALL run the Node smoke test and the worker smoke test, and
+platform. `clean` SHALL remove `build/` and `dist/` and exit `0` without
+requiring a `rimraf` dependency. `test` SHALL run the Node smoke test, and
 `example` SHALL serve the browser example.
 
 #### Scenario: Build pipeline runs in order
@@ -83,8 +82,8 @@ before calling `destroy()`.
 `.github/workflows/publish.yml` SHALL run on a published GitHub release and on
 manual `workflow_dispatch`. It SHALL check out submodules, use Node.js 24,
 install Emscripten `3.1.64` and verify the installed `emcc` reports exactly
-`3.1.64`, run the full build, smoke test, worker test and packed-package
-consumer test, verify `dist/index.mjs`, `dist/xatlas.wasm` and
+`3.1.64`, run the build, smoke test and packed-package consumer test,
+verify `dist/index.mjs`, `dist/xatlas.wasm` and
 `lib/xatlas.d.ts`, record artifact digests and build provenance, and publish
 with `npm publish --provenance --access public` using `id-token: write`.
 
