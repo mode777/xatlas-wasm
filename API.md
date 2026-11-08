@@ -2,12 +2,26 @@
 
 JavaScript/WebAssembly bindings for the [xatlas](https://github.com/jpcy/xatlas) UV atlas generation library. xatlas generates unique texture coordinates suitable for baking lightmaps or texture painting.
 
+> **Current release (`0.1.3`) limitations**
+>
+> - The WASM binary is embedded in the JavaScript bundle (`SINGLE_FILE=1`);
+>   there is no separate `.wasm` asset to locate.
+> - `createXAtlas()` currently takes **no options**. `locateFile` and
+>   `wasmBinary` are planned (XW-002) but are not implemented.
+> - `faceIgnoreData` is not exposed (XW-009).
+> - Only `Uint16Array` and `Uint32Array` index buffers are supported. Other
+>   typed arrays are currently misinterpreted rather than rejected (XW-006).
+> - Atlas objects require an explicit `destroy()`; there is no GC safety net
+>   yet (XW-007).
+>
+> See [docs/improvements.md](docs/improvements.md) for the full backlog.
+
 ## Table of Contents
 
 - [Installation & Setup](#installation--setup)
 - [Quick Start](#quick-start)
 - [Module Initialization](#module-initialization)
-  - [`createXAtlas(options?)`](#createxatlasoptions)
+  - [`createXAtlas()`](#createxatlas)
 - [XAtlasModule](#xatlasmodule)
   - [`createAtlas()`](#createatlas)
   - [`addMeshErrorString(error)`](#addmesherrorstringerror)
@@ -23,6 +37,7 @@ JavaScript/WebAssembly bindings for the [xatlas](https://github.com/jpcy/xatlas)
     - [`setProgressCallback(callback)`](#setprogresscallbackcallback)
     - [`getUtilization(atlasIndex)`](#getutilizationatlasindex)
     - [`getMesh(meshIndex)`](#getmeshmeshindex)
+    - [`getImage()`](#getimage)
     - [`destroy()`](#destroy)
   - [Properties (read-only)](#properties-read-only)
 - [Option Types](#option-types)
@@ -32,6 +47,7 @@ JavaScript/WebAssembly bindings for the [xatlas](https://github.com/jpcy/xatlas)
   - [`PackOptions`](#packoptions)
 - [Output Types](#output-types)
   - [`Mesh`](#mesh)
+  - [`AtlasImage`](#atlasimage)
   - [`Vertex`](#vertex)
   - [`Chart`](#chart)
 - [Enumerations](#enumerations)
@@ -39,6 +55,7 @@ JavaScript/WebAssembly bindings for the [xatlas](https://github.com/jpcy/xatlas)
   - [`IndexFormat`](#indexformat)
   - [`AddMeshError`](#addmesherror)
   - [`ProgressCategory`](#progresscategory)
+- [Image Pixel Format](#image-pixel-format)
 - [Workflows](#workflows)
   - [Simple Atlas Generation](#simple-atlas-generation)
   - [Step-by-Step (Editor Integration)](#step-by-step-editor-integration)
@@ -58,11 +75,13 @@ npm install xatlas-wasm
 Or build from source:
 
 ```bash
+npm ci
 npm run configure   # requires Emscripten (emcmake)
 npm run build
 ```
 
-The package exports an ES module. Import it with:
+The package is ESM-only and requires Node.js >= 16 or a modern browser with
+WebAssembly. Import it with:
 
 ```js
 import createXAtlas from 'xatlas-wasm';
@@ -103,27 +122,24 @@ atlas.destroy();
 
 ## Module Initialization
 
-### `createXAtlas(options?)`
+### `createXAtlas()`
 
 Initializes the xatlas WebAssembly module. Returns a promise that resolves to an [`XAtlasModule`](#xatlasmodule).
 
 ```ts
-function createXAtlas(options?: CreateXAtlasOptions): Promise<XAtlasModule>
+function createXAtlas(): Promise<XAtlasModule>
 ```
 
-#### `CreateXAtlasOptions`
+The current release uses an embedded WASM binary, so there is nothing to
+locate. Custom loader options are planned:
 
-| Property     | Type                                        | Description |
-|-------------|---------------------------------------------|-------------|
-| `locateFile` | `(path: string, prefix: string) => string` | Override the default `.wasm` file location. Called by Emscripten to resolve the path to the `.wasm` binary. |
+| Planned option | Type | Status |
+|---|---|---|
+| `wasmBinary` | `ArrayBuffer \| ArrayBufferView` | Not implemented (XW-002) |
+| `locateFile` | `(path: string, prefix: string) => string` | Not implemented (XW-002) |
 
-**Example — custom wasm path:**
-
-```js
-const xatlas = await createXAtlas({
-  locateFile: (path) => `/static/wasm/${path}`,
-});
-```
+Do not pass options in `0.1.3`; they are ignored at runtime and rejected by the
+TypeScript declarations.
 
 ---
 
@@ -320,6 +336,9 @@ getUtilization(atlasIndex: number): number
 
 Returns a value between 0 and 1. For example, `0.8` means 80% of texels are used (20% empty space). Only valid after packing.
 
+> **Note:** `atlasIndex` is not bounds-checked in `0.1.3` (XW-010). Pass a value
+> in `[0, atlasCount)`.
+
 ---
 
 #### `getMesh(meshIndex)`
@@ -333,6 +352,66 @@ getMesh(meshIndex: number): Mesh
 Returns a [`Mesh`](#mesh) object containing new vertices with atlas UVs, indices, and chart information.
 
 > **Important:** Output meshes have more vertices than input meshes because UV seams require vertex duplication. The index count remains the same. Use the `xref` field on each vertex to map back to the original input vertex.
+
+> **Note:** `meshIndex` is not bounds-checked in `0.1.3` (XW-010). Pass a value
+> in `[0, meshCount)`. After `destroy()`, result access is undefined rather
+> than throwing (XW-007).
+
+---
+
+#### `getImage()`
+
+Retrieve the atlas image texel map. The image is only created when packing ran with [`createImage: true`](#packoptions) — otherwise this returns `null`.
+
+```ts
+getImage(): AtlasImage | null
+```
+
+Returns an [`AtlasImage`](#atlasimage) whose `data` is a flat `Uint32Array` of `atlasCount * width * height` elements. Each element is a **bitfield, not an RGBA color** (see [Image Pixel Format](#image-pixel-format)). Sub-atlas `i` occupies:
+
+```js
+data.subarray(i * width * height, (i + 1) * width * height)
+```
+
+Texels are stored row-major (left to right, top to bottom) per sub-atlas.
+
+Returns `null` when:
+- `createImage` was not set (it defaults to `false`), or
+- `generate()` / `packCharts()` has not been called yet.
+
+The returned `data` is a copy of the WebAssembly heap, so it remains valid after `destroy()`.
+
+**Example — count chart-covered texels and build a debug image:**
+
+```js
+atlas.generate({}, { createImage: true });
+const image = atlas.getImage();
+
+if (image) {
+  const { width, height, atlasCount, data } = image;
+
+  let covered = 0;
+  for (const pixel of data) {
+    if (xatlas.decodeImagePixel(pixel).hasChartIndex) covered++;
+  }
+  console.log(`${covered} covered texels in ${atlasCount} atlas(es)`);
+  console.log(`data length: ${data.length} (expected ${atlasCount * width * height})`);
+
+  // RGBA debug view of sub-atlas 0: hash chart index into a color,
+  // dim padding texels and tint bilinear texels.
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const atlas0 = data.subarray(0, width * height);
+  for (let i = 0; i < atlas0.length; i++) {
+    const p = xatlas.decodeImagePixel(atlas0[i]);
+    const v = p.hasChartIndex ? (Math.imul(p.chartIndex, 2654435761) >>> 24) : 0;
+    rgba[i * 4 + 0] = p.isPadding ? v >> 2 : v;
+    rgba[i * 4 + 1] = p.isBilinear ? v >> 1 : v;
+    rgba[i * 4 + 2] = v;
+    rgba[i * 4 + 3] = 255;
+  }
+  // new ImageData(rgba, width, height) — draw onto a canvas
+}
+```
 
 ---
 
@@ -372,7 +451,7 @@ Options passed to [`addMesh()`](#addmeshoptions).
 | `positions`      | `Float32Array`               | **Yes**  | Vertex positions as flat `[x,y,z, x,y,z, …]`. Length must be `vertexCount × 3`. |
 | `normals`        | `Float32Array`               | No       | Vertex normals as flat `[x,y,z, …]`. Same length as positions. Improves chart quality. |
 | `uvs`            | `Float32Array`               | No       | Vertex UVs as flat `[u,v, …]`. Used as a hint to the chart generator. |
-| `indices`        | `Uint16Array \| Uint32Array` | No       | Triangle indices. If omitted, vertices are assumed to be non-indexed triangles (every 3 vertices form a face). |
+| `indices`        | `Uint16Array \| Uint32Array` | No       | Triangle indices. Must be exactly `Uint16Array` or `Uint32Array`; other typed arrays are currently misinterpreted. If omitted, vertices are assumed to be non-indexed triangles (every 3 vertices form a face). |
 | `faceMaterialData` | `Uint32Array`              | No       | Per-face material IDs. Only faces with the same material will be placed in the same chart. Length = number of faces. |
 | `meshCountHint`  | `number`                     | No       | Hint for total mesh count. Can improve performance when adding many meshes. Default: `0`. |
 
@@ -423,7 +502,7 @@ Options for chart packing, passed to [`packCharts()`](#packchartsoptions) or [`g
 | `bilinear`          | `boolean` | `true`  | Leave space around charts for texels that would be sampled by bilinear filtering. |
 | `blockAlign`        | `boolean` | `false` | Align charts to 4×4 blocks. Can improve packing speed. |
 | `bruteForce`        | `boolean` | `false` | Use brute-force packing for best results. Slower but more space-efficient. |
-| `createImage`       | `boolean` | `false` | Create an atlas image accessible from the result. |
+| `createImage`       | `boolean` | `false` | Create the atlas image texel map, retrievable with [`getImage()`](#getimage). |
 | `rotateChartsToAxis`| `boolean` | `true`  | Rotate charts to the axis of their convex hull before packing. |
 | `rotateCharts`      | `boolean` | `true`  | Rotate charts to improve packing efficiency. |
 
@@ -443,6 +522,19 @@ Returned by [`getMesh()`](#getmeshmeshindex). Represents the output mesh with ge
 | `vertices`   | [`Vertex[]`](#vertex)     | Output vertices with atlas UVs and cross-references to input vertices. |
 | `indices`    | `Uint32Array`             | Output triangle indices into the `vertices` array. |
 | `charts`     | [`Chart[]`](#chart)       | Charts in this mesh. |
+
+---
+
+### `AtlasImage`
+
+Returned by [`getImage()`](#getimage). A flat texel map of all sub-atlases.
+
+| Property     | Type         | Description |
+|-------------|--------------|-------------|
+| `width`     | `number`     | Atlas width in texels. |
+| `height`    | `number`     | Atlas height in texels. |
+| `atlasCount`| `number`     | Number of sub-atlases in the buffer. |
+| `data`      | `Uint32Array`| Copied pixel bitfields, length `atlasCount * width * height`. Sub-atlas `i` starts at index `i * width * height`. |
 
 ---
 
@@ -530,6 +622,50 @@ Progress callback stage identifiers. Accessed via `xatlas.ProgressCategory`.
 | `BuildOutputMeshes`| `3`  | Building the final output mesh data. |
 
 Use `xatlas.progressCategoryString(category)` to get a human-readable name.
+
+---
+
+## Image Pixel Format
+
+Atlas image texels (from [`getImage()`](#getimage)) are `uint32` bitfields, not colors. The layout matches `xatlas.h` / `xatlas_c.h`:
+
+| Constant               | Value        | Description |
+|-----------------------|--------------|-------------|
+| `ImageChartIndexMask` | `0x1FFFFFFF` | Mask for the chart index. |
+| `ImageHasChartIndexBit`| `0x80000000` | Set when the texel is covered by a chart. |
+| `ImageIsBilinearBit`  | `0x40000000` | Set when the texel was added for bilinear filtering safety. |
+| `ImageIsPaddingBit`   | `0x20000000` | Set when the texel is padding (dilated) geometry. |
+
+The constants are available as named exports and on the initialized module (`xatlas.ImageChartIndexMask`, etc.).
+
+### `decodeImagePixel(pixel)`
+
+Decode a raw pixel value without doing the bit math yourself. Available as a named export and as `xatlas.decodeImagePixel`.
+
+```ts
+decodeImagePixel(pixel: number): {
+  chartIndex: number;
+  hasChartIndex: boolean;
+  isBilinear: boolean;
+  isPadding: boolean;
+}
+```
+
+```js
+const { chartIndex, hasChartIndex, isBilinear, isPadding } =
+  xatlas.decodeImagePixel(image.data[0]);
+```
+
+Equivalent manual decoding:
+
+```js
+const chartIndex    = pixel & 0x1FFFFFFF;
+const hasChartIndex = (pixel & 0x80000000) !== 0;
+const isBilinear    = (pixel & 0x40000000) !== 0;
+const isPadding     = (pixel & 0x20000000) !== 0;
+```
+
+> Chart indices are global across all meshes in the atlas (they match the `chartIndex` values reported by [`getMesh()`](#getmeshmeshindex)), so they are all `< atlas.chartCount`.
 
 ---
 
@@ -679,5 +815,10 @@ See `example/main.mjs` for a full browser example with OBJ loading and canvas re
 - **Output vertex count** is always ≥ input vertex count because UV seams require vertex duplication. Use the `xref` field to map output vertices back to your original vertex data (positions, normals, colors, etc.).
 - **Output index count** always equals input index count.
 - Call `destroy()` when done to avoid WASM memory leaks.
+- The current build embeds the WASM binary in the module (`SINGLE_FILE=1`), so
+  there is no `.wasm` URL to configure. Loader options are planned (XW-002).
 - The module is thread-safe for separate atlas instances, but a single `XAtlas` instance should not be used concurrently.
+- Web Worker usage is not an explicitly supported environment in `0.1.3`
+  (XW-003); run the package on the main thread or test your worker setup
+  before relying on it.
 - For best performance with large meshes, consider using `bruteForce: false` (the default) during iteration, and `bruteForce: true` only for the final pack.

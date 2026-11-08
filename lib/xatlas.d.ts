@@ -49,6 +49,35 @@ export declare const ProgressCategory: {
 export type ProgressCategory =
   (typeof ProgressCategory)[keyof typeof ProgressCategory];
 
+/* ── Atlas image pixel format ────────────────────────────────────── */
+
+/** Mask for the chart index stored in an atlas image pixel. */
+export declare const ImageChartIndexMask: 0x1fffffff;
+/** Set when the texel is covered by a chart. */
+export declare const ImageHasChartIndexBit: 0x80000000;
+/** Set when the texel was added for bilinear filtering safety. */
+export declare const ImageIsBilinearBit: 0x40000000;
+/** Set when the texel is padding (dilated) geometry. */
+export declare const ImageIsPaddingBit: 0x20000000;
+
+/** Decoded atlas image pixel. */
+export interface DecodedImagePixel {
+  /** Chart index stored in the pixel (`pixel & ImageChartIndexMask`). */
+  chartIndex: number;
+  /** True when the texel is covered by a chart. */
+  hasChartIndex: boolean;
+  /** True when the texel was added for bilinear filtering safety. */
+  isBilinear: boolean;
+  /** True when the texel is padding (dilated) geometry. */
+  isPadding: boolean;
+}
+
+/**
+ * Decode an atlas image pixel bitfield.
+ * @param pixel - Raw pixel value from `AtlasImage.data`.
+ */
+export declare function decodeImagePixel(pixel: number): DecodedImagePixel;
+
 /* ── Input option types ──────────────────────────────────────────── */
 
 /** Options for adding a triangle mesh. */
@@ -176,7 +205,7 @@ export interface PackOptions {
    */
   bruteForce?: boolean;
   /**
-   * Create the atlas image (accessible from the atlas result).
+   * Create the atlas image texel map, retrievable with `getImage()`.
    * @default false
    */
   createImage?: boolean;
@@ -234,6 +263,24 @@ export interface Mesh {
   indices: Uint32Array;
   /** Charts in this mesh. */
   charts: Chart[];
+}
+
+/**
+ * Atlas image texel map, returned by `getImage()`.
+ *
+ * Each entry in `data` is a bitfield, not a color. Decode it with
+ * `decodeImagePixel()` or the `Image*` constants.
+ * Sub-atlas `i` occupies `data.subarray(i * width * height, (i + 1) * width * height)`.
+ */
+export interface AtlasImage {
+  /** Atlas width in texels. */
+  width: number;
+  /** Atlas height in texels. */
+  height: number;
+  /** Number of sub-atlases in the buffer. */
+  atlasCount: number;
+  /** Copied texel data, length `atlasCount * width * height`. */
+  data: Uint32Array;
 }
 
 /**
@@ -308,6 +355,13 @@ export interface XAtlas {
    */
   getMesh(meshIndex: number): Mesh;
 
+  /**
+   * Retrieve the atlas image texel map.
+   * Returns null unless packing ran with `createImage: true`.
+   * The returned `data` is a copy and stays valid after `destroy()`.
+   */
+  getImage(): AtlasImage | null;
+
   /** Destroy the atlas and free all associated memory. */
   destroy(): void;
 }
@@ -323,11 +377,17 @@ export interface XAtlasModule {
   addMeshErrorString(error: AddMeshError): string;
   /** Get a human-readable string for a ProgressCategory code. */
   progressCategoryString(category: ProgressCategory): string;
+  /** Decode an atlas image pixel bitfield. */
+  decodeImagePixel(pixel: number): DecodedImagePixel;
 
   readonly ChartType: typeof ChartType;
   readonly IndexFormat: typeof IndexFormat;
   readonly AddMeshError: typeof AddMeshError;
   readonly ProgressCategory: typeof ProgressCategory;
+  readonly ImageChartIndexMask: typeof ImageChartIndexMask;
+  readonly ImageHasChartIndexBit: typeof ImageHasChartIndexBit;
+  readonly ImageIsBilinearBit: typeof ImageIsBilinearBit;
+  readonly ImageIsPaddingBit: typeof ImageIsPaddingBit;
 }
 
 /**

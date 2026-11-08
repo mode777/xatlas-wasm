@@ -2,8 +2,9 @@
  * xatlas-wasm browser example.
  *
  * Loads an OBJ model, generates a UV atlas via xatlas-wasm, and renders:
- *   - Left canvas:  3D wireframe (orthographic, mouse-drag rotation)
- *   - Right canvas: 2D UV chart overlay (colored per chart)
+ *   - Left canvas:   3D wireframe (orthographic, mouse-drag rotation)
+ *   - Middle canvas: 2D UV chart overlay (colored per chart)
+ *   - Right canvas:  atlas image texel map (chart colors, padding/bilinear dimmed)
  */
 import { parseOBJ } from './obj-loader.mjs';
 import createXAtlas from '../dist/index.mjs';
@@ -12,8 +13,10 @@ import createXAtlas from '../dist/index.mjs';
 
 const canvas3D = document.getElementById('canvas3d');
 const canvasUV = document.getElementById('canvasUv');
+const canvasAtlas = document.getElementById('canvasAtlas');
 const ctx3D = canvas3D.getContext('2d');
 const ctxUV = canvasUV.getContext('2d');
+const ctxAtlas = canvasAtlas.getContext('2d');
 
 const fileInput = document.getElementById('fileInput');
 const loadDefaultBtn = document.getElementById('loadDefault');
@@ -25,6 +28,7 @@ const progressEl = document.getElementById('progress');
 let inputMesh = null;   // { positions, normals, uvs, indices }
 let outputMesh = null;  // from atlas.getMesh(0)
 let atlasInfo = null;   // { width, height, chartCount, atlasCount, utilization, meshCount }
+let atlasImage = null;  // from atlas.getImage() when createImage is enabled
 
 // 3D rotation (Euler angles in radians)
 let rotX = -0.4;
@@ -65,6 +69,7 @@ function loadOBJFromFile(file) {
 
 async function processModel(objText) {
   try {
+    atlasImage = null;
     setStatus('Parsing OBJ…');
     inputMesh = parseOBJ(objText);
 
@@ -92,7 +97,7 @@ async function processModel(objText) {
     }
 
     setStatus('Generating atlas…');
-    atlas.generate();
+    atlas.generate({}, { createImage: true });
 
     // Gather results
     const utilization = [];
@@ -111,11 +116,13 @@ async function processModel(objText) {
     };
 
     outputMesh = atlas.getMesh(0);
+    atlasImage = atlas.getImage();  // copy — remains valid after destroy()
     atlas.destroy();
 
     renderStats();
     render3D();
     renderUV();
+    renderAtlasImage();
     setStatus('Done');
     progressEl.textContent = '';
   } catch (e) {
@@ -275,6 +282,98 @@ function renderUV() {
   ctxUV.stroke();
 }
 
+/* ── Atlas image rendering ───────────────────────────────────────── */
+
+// Standard HSL → RGB, h in degrees, s/l in 0–1, returns [r, g, b] 0–255.
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60)       { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else              { r = c; b = x; }
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255),
+  ];
+}
+
+// Same golden-angle palette as chartColor(), returned as RGB for pixel writes.
+function chartColorRGB(chartIndex, lightness = 0.55) {
+  return hslToRgb((chartIndex * 137.508) % 360, 0.7, lightness);
+}
+
+function renderAtlasImage() {
+  if (!atlasImage) return;
+
+  const W = canvasAtlas.width;
+  const H = canvasAtlas.height;
+  ctxAtlas.clearRect(0, 0, W, H);
+
+  const drawBorder = () => {
+    ctxAtlas.strokeStyle = '#555';
+    ctxAtlas.lineWidth = 1;
+    ctxAtlas.strokeRect(0.5, 0.5, W - 1, H - 1);
+  };
+
+  const iw = atlasImage.width;
+  const ih = atlasImage.height;
+  if (!iw || !ih) {
+    // Degenerate image: nothing to blit, keep the border only.
+    drawBorder();
+    return;
+  }
+
+  // Decode sub-atlas 0 at native resolution, then scale it up to the canvas.
+  const offscreen = document.createElement('canvas');
+  offscreen.width = iw;
+  offscreen.height = ih;
+  const offCtx = offscreen.getContext('2d');
+  const imgData = offCtx.createImageData(iw, ih);
+  const out = imgData.data;
+  const texelCount = iw * ih;
+
+  for (let i = 0; i < texelCount; i++) {
+    const texel = xatlas.decodeImagePixel(atlasImage.data[i]);
+    // Image rows run bottom-up (row 0 = uv v = 0); canvases draw top-down,
+    // so write each texel into the vertically mirrored output row.
+    const x = i % iw;
+    const y = (i / iw) | 0;
+    const o = ((ih - 1 - y) * iw + x) * 4;
+
+    if (texel.hasChartIndex) {
+      // Base hue per chart; padding/bilinear texels are dimmed.
+      const lightness = texel.isPadding ? 0.30 : texel.isBilinear ? 0.40 : 0.55;
+      const [r, g, b] = chartColorRGB(texel.chartIndex, lightness);
+      out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = 255;
+    } else if (texel.isBilinear || texel.isPadding) {
+      out[o] = 45; out[o + 1] = 55; out[o + 2] = 75; out[o + 3] = 255;
+    } else {
+      out[o + 3] = 0;  // fully empty texel: transparent
+    }
+  }
+  offCtx.putImageData(imgData, 0, 0);
+
+  // Letterbox: scale to fit while preserving the image aspect ratio.
+  const scale = Math.min(W / iw, H / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const dx = (W - dw) / 2;
+  const dy = (H - dh) / 2;
+
+  ctxAtlas.imageSmoothingEnabled = false;
+  ctxAtlas.drawImage(offscreen, dx, dy, dw, dh);
+  ctxAtlas.imageSmoothingEnabled = true;
+
+  drawBorder();
+}
+
 /* ── Mouse rotation for 3D canvas ────────────────────────────────── */
 
 canvas3D.addEventListener('pointerdown', (e) => {
@@ -316,3 +415,11 @@ fileInput.addEventListener('change', async () => {
 /* ── Kick off ────────────────────────────────────────────────────── */
 
 setStatus('Ready. Load a model to begin.');
+
+// Optional ?model=gazebo auto-load for headless verification.
+const modelParam = new URLSearchParams(location.search).get('model');
+if (modelParam === 'gazebo' || modelParam === 'gazebo.obj') {
+  loadOBJFromURL('../thirdparty/xatlas/models/gazebo.obj')
+    .then(processModel)
+    .catch((e) => setStatus('Error loading model: ' + e.message));
+}
