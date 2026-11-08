@@ -66,15 +66,18 @@ entry with esbuild. It produces:
 
 | Output | Contents |
 |---|---|
-| `dist/xatlas.mjs` | Emscripten ES module glue. With the current `SINGLE_FILE=1` setting, the WASM binary is embedded here as base64. |
-| `dist/index.mjs` | The bundled npm entry point (wrapper + glue + embedded WASM). |
+| `dist/xatlas.mjs` | Emscripten ES module glue; it resolves the sibling `xatlas.wasm` at runtime. |
+| `dist/xatlas.wasm` | The standalone WebAssembly binary loaded by the glue. |
+| `dist/index.mjs` | The bundled npm entry point (wrapper + glue); the WASM is not embedded. |
 
-There is currently **no separate `dist/xatlas.wasm`**. Switching to a lazily
-loaded, separately cached artifact is planned as XW-001; see
-[`docs/improvements.md`](docs/improvements.md).
+The package ships `dist/index.mjs` and `dist/xatlas.wasm` side by side. Keep
+them together when copying or serving the package; alternatively supply
+`wasmBinary` or `locateFile` to `createXAtlas()`. See
+[`docs/improvements.md`](docs/improvements.md) for the XW-001 design rationale.
 
-Running `cmake --build build` alone produces only `dist/xatlas.mjs`; use
-`npm run build` when you need the publishable `dist/index.mjs`.
+Running `cmake --build build` alone produces `dist/xatlas.mjs` and
+`dist/xatlas.wasm`; use `npm run build` when you need the publishable
+`dist/index.mjs`.
 
 ## Test
 
@@ -84,11 +87,13 @@ npm test
 node test/test.mjs
 ```
 
-The test imports `dist/index.mjs`, so build first. If the bundle is missing it
-prints `dist/index.mjs not found. Run "npm run build" first.` to stderr and
-exits 1 instead of failing with a bare module error. The smoke test adds a
-four-vertex quad, generates an atlas and checks the output dimensions, mesh
-counts and the `getImage()` behaviour; success ends with `All checks passed.`
+`npm test` runs the Node smoke test, the loader-options test and the worker
+test. The tests import `dist/index.mjs`, so build first. If `dist/index.mjs` or
+`dist/xatlas.wasm` is missing, the smoke test prints a preflight message naming
+`npm run build` and exits 1 instead of failing with a bare module error. The
+smoke test adds a four-vertex quad, generates an atlas and checks the output
+dimensions, mesh counts and the `getImage()` behaviour; success ends with
+`All checks passed.`
 
 ### Packed-package consumer test
 
@@ -99,25 +104,28 @@ npm run test:package
 `scripts/test-package.mjs` packs the real npm tarball, installs it into a
 scratch project under the OS temp directory (not in the repository), and then:
 
-- checks the tarball contains `dist/index.mjs`, `lib/xatlas.d.ts`,
-  `README.md` and `package.json`;
-- runs a Node consumer that imports the installed package, generates an atlas
-  with `createImage: true` and checks `getImage()`;
+- checks the tarball contains `dist/index.mjs`, `dist/xatlas.wasm`,
+  `lib/xatlas.d.ts`, `README.md` and `package.json`;
+- runs a Node consumer that imports the installed package, resolves the
+  sibling WASM, generates an atlas with `createImage: true` and checks
+  `getImage()`;
 - typechecks a TypeScript consumer against the packaged declarations with the
-  repository's `typescript`;
-- runs a Vite production build of a consumer app and asserts it emitted and
-  referenced a JS asset.
+  repository's `typescript`, including the loader options;
+- runs a Vite production build of a consumer app, asserts it emitted and
+  referenced both a JS asset and the `.wasm` asset, and fails if Vite reports a
+  Node built-in externalization warning.
 
 The scratch tree is removed on success and kept on failure for inspection;
 `KEEP_PACKAGE_TEST=1 npm run test:package` keeps it after a successful run.
 `TEST_PACKAGE_DROP=<file>` deletes a file from the installed scratch copy before
 the consumers run; it is a maintainer hook for proving a broken package fails,
-not part of CI.
+not part of CI. Dropping `dist/xatlas.wasm` must fail the installed-contents
+check.
 
-Under the current `SINGLE_FILE=1` layout the package has no separate `.wasm`
-asset, so the test intentionally does not expect one — that check arrives with
-XW-001. It also does not require a root `LICENSE` in the tarball; fixing the
-package contents is XW-018. Both limitations are tracked in
+`npm run bundle` uses `scripts/bundle.mjs` with esbuild `--platform=neutral`.
+Emscripten's Node-only `import("module")` is rewritten to a non-literal
+specifier so Vite does not externalize it for browser consumers. The package
+does not yet contain a root `LICENSE`; adding it is XW-018. See
 [`docs/improvements.md`](docs/improvements.md).
 
 ## Clean
@@ -137,8 +145,8 @@ PowerShell/cmd has no `rm -rf`.
 | `npm run configure`| Run the emcmake CMake configure step |
 | `npm run prebuild` | Internal `build` hook: configure when `build/CMakeCache.txt` is missing and ensure `dist/` exists |
 | `npm run build`    | Auto-configure if needed, build WASM, then bundle into `dist/index.mjs` |
-| `npm run bundle`   | Bundle `lib/xatlas.mjs` + Emscripten glue via esbuild |
-| `npm test`         | Run the Node smoke test (with the `dist/index.mjs` preflight) |
+| `npm run bundle`   | Bundle `lib/xatlas.mjs` + Emscripten glue with the neutral esbuild config |
+| `npm test`         | Run the Node smoke, loader-options and worker tests |
 | `npm run test:package` | Pack the tarball and run the Node/TypeScript/Vite consumer test |
 | `npm run clean`    | Remove `build/` and `dist/` with `rm -rf` (Unix-like shell) |
 | `npm run example`  | Serve the browser example on port 3000 |
@@ -202,6 +210,6 @@ OpenCode commands: `/opsx-propose`, `/opsx-apply`, `/opsx-archive`,
   support” means running the whole module inside a Web Worker, not pthreads.
 - The C API is enabled (`XATLAS_C_API=1`) for use from JavaScript via the
   accessor layer in `src/xatlas_wasm.c`.
-- The current build uses `SINGLE_FILE=1`; the rationale and the planned
-  separate-artifact alternative are documented in the improvement backlog.
+- The build emits a separate `dist/xatlas.wasm`; the rationale and measured
+  trade-off are documented in the improvement backlog.
 - `build/` and `dist/` are gitignored build outputs; do not commit them.

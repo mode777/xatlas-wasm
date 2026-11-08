@@ -2,26 +2,25 @@
 
 JavaScript/WebAssembly bindings for the [xatlas](https://github.com/jpcy/xatlas) UV atlas generation library. xatlas generates unique texture coordinates suitable for baking lightmaps or texture painting.
 
-> **Current release (`0.1.3`) limitations**
+> **Known limitations**
 >
-> - The WASM binary is embedded in the JavaScript bundle (`SINGLE_FILE=1`);
->   there is no separate `.wasm` asset to locate.
-> - `createXAtlas()` currently takes **no options**. `locateFile` and
->   `wasmBinary` are planned (XW-002) but are not implemented.
 > - `faceIgnoreData` is not exposed (XW-009).
 > - Only `Uint16Array` and `Uint32Array` index buffers are supported. Other
 >   typed arrays are currently misinterpreted rather than rejected (XW-006).
 > - Atlas objects require an explicit `destroy()`; there is no GC safety net
 >   yet (XW-007).
 >
-> See [docs/improvements.md](docs/improvements.md) for the full backlog.
+> The WASM binary ships as a separate `dist/xatlas.wasm` beside the package
+> entry; `createXAtlas(options?)` accepts `wasmBinary`, `locateFile`, `print`
+> and `printErr`. See [docs/improvements.md](docs/improvements.md) for the full
+> backlog.
 
 ## Table of Contents
 
 - [Installation & Setup](#installation--setup)
 - [Quick Start](#quick-start)
 - [Module Initialization](#module-initialization)
-  - [`createXAtlas()`](#createxatlas)
+  - [`createXAtlas(options?)`](#createxatlasoptions)
 - [XAtlasModule](#xatlasmodule)
   - [`createAtlas()`](#createatlas)
   - [`addMeshErrorString(error)`](#addmesherrorstringerror)
@@ -56,6 +55,7 @@ JavaScript/WebAssembly bindings for the [xatlas](https://github.com/jpcy/xatlas)
   - [`AddMeshError`](#addmesherror)
   - [`ProgressCategory`](#progresscategory)
 - [Image Pixel Format](#image-pixel-format)
+- [Workers](#workers)
 - [Workflows](#workflows)
   - [Simple Atlas Generation](#simple-atlas-generation)
   - [Step-by-Step (Editor Integration)](#step-by-step-editor-integration)
@@ -122,24 +122,45 @@ atlas.destroy();
 
 ## Module Initialization
 
-### `createXAtlas()`
+### `createXAtlas(options?)`
 
 Initializes the xatlas WebAssembly module. Returns a promise that resolves to an [`XAtlasModule`](#xatlasmodule).
 
 ```ts
-function createXAtlas(): Promise<XAtlasModule>
+function createXAtlas(options?: CreateXAtlasOptions): Promise<XAtlasModule>
 ```
 
-The current release uses an embedded WASM binary, so there is nothing to
-locate. Custom loader options are planned:
+The package ships `dist/xatlas.wasm` beside the JavaScript entry. With no
+options the Emscripten glue resolves it with
+`new URL('xatlas.wasm', import.meta.url)`, which bundlers such as Vite,
+webpack 5 and Rollup emit automatically. Without a bundler, copy
+`xatlas.wasm` next to `index.mjs`, or pass `locateFile`/`wasmBinary`.
 
-| Planned option | Type | Status |
+#### `CreateXAtlasOptions`
+
+| Property | Type | Description |
 |---|---|---|
-| `wasmBinary` | `ArrayBuffer \| ArrayBufferView` | Not implemented (XW-002) |
-| `locateFile` | `(path: string, prefix: string) => string` | Not implemented (XW-002) |
+| `wasmBinary` | `ArrayBuffer \| ArrayBufferView` | Explicit WASM bytes. Takes precedence over `locateFile`; when supplied, the loader does not resolve or fetch `xatlas.wasm`. |
+| `locateFile` | `(path: string, prefix: string) => string` | Resolve the WASM artifact path and prefix to a URL. Only called when `wasmBinary` is not supplied. |
+| `print` | `(text: string) => void` | Redirect the Emscripten module's standard output. |
+| `printErr` | `(text: string) => void` | Redirect the Emscripten module's standard error. |
 
-Do not pass options in `0.1.3`; they are ignored at runtime and rejected by the
-TypeScript declarations.
+```js
+// Custom URL
+const xatlas = await createXAtlas({
+  locateFile: (path) => `/static/wasm/${path}`,
+});
+```
+
+```js
+// Explicit bytes (the binary is not fetched)
+const wasmBinary = await (await fetch('/assets/xatlas.wasm')).arrayBuffer();
+const xatlas = await createXAtlas({ wasmBinary });
+```
+
+Invalid option types reject with a `TypeError` naming the offending option.
+If the artifact cannot be loaded, `createXAtlas()` rejects with an `Error` that
+names `xatlas.wasm` and preserves the underlying cause as `cause`.
 
 ---
 
@@ -669,6 +690,72 @@ const isPadding     = (pixel & 0x20000000) !== 0;
 
 ---
 
+## Workers
+
+The kernel is compiled single-threaded (`XA_MULTITHREADED=0`). Worker support
+means running a whole xatlas-wasm module inside a worker, not sharing WASM
+memory between threads. The package is built for the `worker` Emscripten
+environment in addition to Node and browsers.
+
+### Browser module worker
+
+```js
+// atlas-worker.js
+import createXAtlas from 'xatlas-wasm';
+
+const xatlas = await createXAtlas();
+const atlas = xatlas.createAtlas();
+atlas.addMesh({ positions, indices });
+atlas.generate();
+self.postMessage({
+  width: atlas.width,
+  height: atlas.height,
+  vertexCount: atlas.getMesh(0).vertexCount,
+});
+atlas.destroy();
+```
+
+```js
+// main.js
+const worker = new Worker(new URL('./atlas-worker.js', import.meta.url), {
+  type: 'module',
+});
+worker.onmessage = ({ data }) => console.log(data);
+```
+
+### Node.js worker thread
+
+```js
+// atlas-worker.mjs
+import { parentPort } from 'node:worker_threads';
+import createXAtlas from 'xatlas-wasm';
+
+const xatlas = await createXAtlas();
+const atlas = xatlas.createAtlas();
+atlas.addMesh({ positions, indices });
+atlas.generate();
+parentPort.postMessage({
+  width: atlas.width,
+  height: atlas.height,
+  vertexCount: atlas.getMesh(0).vertexCount,
+});
+atlas.destroy();
+```
+
+```js
+// main.mjs
+import { Worker } from 'node:worker_threads';
+
+const worker = new Worker(new URL('./atlas-worker.mjs', import.meta.url));
+worker.on('message', (result) => console.log(result));
+worker.on('error', (error) => console.error(error));
+```
+
+The repository's `test/worker-entry.mjs` follows the Node recipe and is run by
+`npm test`.
+
+---
+
 ## Workflows
 
 ### Simple Atlas Generation
@@ -815,10 +902,10 @@ See `example/main.mjs` for a full browser example with OBJ loading and canvas re
 - **Output vertex count** is always ≥ input vertex count because UV seams require vertex duplication. Use the `xref` field to map output vertices back to your original vertex data (positions, normals, colors, etc.).
 - **Output index count** always equals input index count.
 - Call `destroy()` when done to avoid WASM memory leaks.
-- The current build embeds the WASM binary in the module (`SINGLE_FILE=1`), so
-  there is no `.wasm` URL to configure. Loader options are planned (XW-002).
+- The WASM binary ships as `dist/xatlas.wasm` beside the package entry; use
+  `locateFile` or `wasmBinary` when it lives elsewhere.
 - The module is thread-safe for separate atlas instances, but a single `XAtlas` instance should not be used concurrently.
-- Web Worker usage is not an explicitly supported environment in `0.1.3`
-  (XW-003); run the package on the main thread or test your worker setup
-  before relying on it.
+- Web Workers are supported by running the whole module inside a worker; see
+  [Workers](#workers). The kernel is single-threaded, so there is no shared
+  WASM memory between threads.
 - For best performance with large meshes, consider using `bruteForce: false` (the default) during iteration, and `bruteForce: true` only for the final pack.

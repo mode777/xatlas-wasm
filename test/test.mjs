@@ -8,8 +8,13 @@
 import { existsSync } from 'node:fs';
 
 const entry = new URL('../dist/index.mjs', import.meta.url);
-if (!existsSync(entry)) {
-  console.error('dist/index.mjs not found. Run "npm run build" first.');
+const wasm = new URL('../dist/xatlas.wasm', import.meta.url);
+const missing = [entry, wasm].filter((file) => !existsSync(file));
+if (missing.length > 0) {
+  console.error(
+    `${missing.map((file) => file.pathname.split('/').pop()).join(' and ')} not found. ` +
+      'Run "npm run build" first.'
+  );
   process.exit(1);
 }
 const { default: createXAtlas } = await import(entry.href);

@@ -12,7 +12,7 @@
  * Break the installed copy on purpose (local hook): TEST_PACKAGE_DROP=<file>
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_ENTRY = path.join(REPO_ROOT, 'dist', 'index.mjs');
+const DIST_WASM = path.join(REPO_ROOT, 'dist', 'xatlas.wasm');
 const DIST_TYPES = path.join(REPO_ROOT, 'lib', 'xatlas.d.ts');
 const TSC = path.join(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
 const VITE = path.join(REPO_ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
@@ -41,6 +42,10 @@ function fail(message) {
   process.exit(1);
 }
 
+function failStage(message) {
+  throw new Error(message);
+}
+
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
     cwd: options.cwd ?? REPO_ROOT,
@@ -52,6 +57,9 @@ function run(command, args, options = {}) {
 // --- Preflight ------------------------------------------------------------
 if (!existsSync(DIST_ENTRY)) {
   fail('dist/index.mjs is missing; run "npm run build" first.');
+}
+if (!existsSync(DIST_WASM)) {
+  fail('dist/xatlas.wasm is missing; run "npm run build" first.');
 }
 if (!existsSync(DIST_TYPES)) {
   fail('lib/xatlas.d.ts is missing; run "npm run build" first.');
@@ -72,7 +80,7 @@ try {
   // --- Pack and inspect the tarball --------------------------------------
   run(NPM, ['pack', '--ignore-scripts', '--pack-destination', PACK_DIR]);
   const tarball = readdirSync(PACK_DIR).find((file) => file.endsWith('.tgz'));
-  if (!tarball) fail(`npm pack produced no tarball in ${PACK_DIR}`);
+  if (!tarball) failStage(`npm pack produced no tarball in ${PACK_DIR}`);
   console.log(`test-package: packed ${tarball}`);
 
   stage = 'tarball contents';
@@ -82,12 +90,13 @@ try {
     .map((line) => line.trim());
   for (const required of [
     'package/dist/index.mjs',
+    'package/dist/xatlas.wasm',
     'package/lib/xatlas.d.ts',
     'package/README.md',
     'package/package.json',
   ]) {
     if (!listing.includes(required)) {
-      fail(`tarball is missing ${required}`);
+      failStage(`tarball is missing ${required}`);
     }
   }
 
@@ -120,13 +129,21 @@ try {
     stage = 'negative drop';
     const target = path.resolve(INSTALLED, drop);
     if (!target.startsWith(`${INSTALLED}${path.sep}`)) {
-      fail(`TEST_PACKAGE_DROP must name a file inside the installed package: ${drop}`);
+      failStage(`TEST_PACKAGE_DROP must name a file inside the installed package: ${drop}`);
     }
     if (!existsSync(target)) {
-      fail(`TEST_PACKAGE_DROP file not found in the installed package: ${drop}`);
+      failStage(`TEST_PACKAGE_DROP file not found in the installed package: ${drop}`);
     }
     rmSync(target, { force: true });
     console.log(`test-package: dropped ${drop} from the installed package`);
+  }
+
+  // --- Installed package contents -----------------------------------------
+  stage = 'installed contents';
+  for (const required of ['dist/index.mjs', 'dist/xatlas.wasm', 'lib/xatlas.d.ts']) {
+    if (!existsSync(path.join(INSTALLED, required))) {
+      failStage(`installed package is missing ${required}`);
+    }
   }
 
   // --- Node consumer ------------------------------------------------------
@@ -176,10 +193,16 @@ atlas.destroy();
   writeFileSync(
     path.join(PROJECT, 'check.ts'),
     `import createXAtlas from 'xatlas-wasm';
-import type { AtlasImage, Mesh, XAtlas } from 'xatlas-wasm';
+import type { AtlasImage, CreateXAtlasOptions, Mesh, XAtlas } from 'xatlas-wasm';
 
 export async function run(): Promise<number> {
-  const xatlas = await createXAtlas();
+  const options: CreateXAtlasOptions = {
+    wasmBinary: new Uint8Array(),
+    locateFile: (path) => path,
+    print: () => {},
+    printErr: () => {},
+  };
+  const xatlas = await createXAtlas(options);
   const atlas: XAtlas = xatlas.createAtlas();
   atlas.addMesh({
     positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
@@ -243,19 +266,45 @@ async function main() {
 main();
 `,
   );
-  run(process.execPath, [VITE, 'build', '--logLevel', 'warn'], { cwd: PROJECT });
+  const vite = spawnSync(process.execPath, [VITE, 'build', '--logLevel', 'warn'], {
+    cwd: PROJECT,
+    encoding: 'utf8',
+  });
+  if (vite.status !== 0) {
+    failStage(`Vite build failed:\n${vite.stdout ?? ''}\n${vite.stderr ?? ''}`);
+  }
+  const viteLog = `${vite.stdout ?? ''}\n${vite.stderr ?? ''}`;
+  if (/externalized for browser compatibility/.test(viteLog)) {
+    failStage(`Vite reported a Node built-in externalization warning:\n${viteLog.trim()}`);
+  }
 
   stage = 'vite assertions';
   const distDir = path.join(PROJECT, 'dist');
   const assetsDir = path.join(distDir, 'assets');
   const emitted = existsSync(assetsDir) ? readdirSync(assetsDir) : [];
-  const jsAssets = emitted.filter((file) => file.endsWith('.js'));
+  const jsAssets = emitted.filter((file) => /\.m?js$/.test(file));
   if (jsAssets.length === 0) {
-    fail(`Vite build emitted no JS asset (assets: ${emitted.join(', ')})`);
+    failStage(`Vite build emitted no JS asset (assets: ${emitted.join(', ')})`);
+  }
+  const wasmAssets = emitted.filter((file) => file.endsWith('.wasm'));
+  if (wasmAssets.length === 0) {
+    failStage(`Vite build emitted no WASM asset (assets: ${emitted.join(', ')})`);
+  }
+  const extraModuleChunks = emitted.filter((file) => file.endsWith('.mjs'));
+  if (extraModuleChunks.length > 0) {
+    failStage(
+      `Vite emitted unexpected extra module chunk(s): ${extraModuleChunks.join(', ')}`
+    );
+  }
+  const jsContents = jsAssets
+    .map((file) => readFileSync(path.join(assetsDir, file), 'utf8'))
+    .join('\n');
+  if (!jsContents.includes('.wasm')) {
+    failStage(`Vite JS does not reference a WASM asset (assets: ${emitted.join(', ')})`);
   }
   const html = readFileSync(path.join(distDir, 'index.html'), 'utf8');
   if (!html.includes('assets/') || !jsAssets.some((file) => html.includes(file))) {
-    fail(`Vite build did not reference an emitted JS asset (assets: ${jsAssets.join(', ')})`);
+    failStage(`Vite build did not reference an emitted JS asset (assets: ${jsAssets.join(', ')})`);
   }
   console.log(`test-package: Vite build emitted ${emitted.join(', ')}`);
   console.log('test-package: all checks passed');

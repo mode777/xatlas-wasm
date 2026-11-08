@@ -122,6 +122,5 @@ target_link_options(xatlas PRIVATE
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s ALLOW_TABLE_GROWTH=1"
     "SHELL:-s NO_EXIT_RUNTIME=1"
-    "SHELL:-s ENVIRONMENT=web,node"
-    "SHELL:-s SINGLE_FILE=1"
+    "SHELL:-s ENVIRONMENT=web,node,worker"
 )

@@ -42,9 +42,13 @@ OpenSpec scaffolding and this document were added afterwards.
 
 ---
 
-## 2. How `xatlas-wasm` loads WASM today
+## 2. How `xatlas-wasm` loaded WASM before this change
 
-`xatlas-wasm` does **not** fetch or stream a `.wasm` asset. The wasm binary is
+> **Status:** this section records the pre-change `0.1.3` baseline.
+> `wasm-loader-options` replaced the embedded layout with a separate
+> `dist/xatlas.wasm`; see XW-001–XW-005 below.
+
+`xatlas-wasm` did **not** fetch or stream a `.wasm` asset. The wasm binary was
 embedded in the JavaScript bundle as base64.
 
 ### 2.1 Build-time embedding
@@ -219,6 +223,19 @@ vendoring machinery.
   - a Vite consumer build emits the wasm asset;
   - the package tarball contains the `.wasm` and the license.
 - **Suggested OpenSpec change:** `wasm-loader-options`
+- **Progress (2026-11-08):** implemented by the `wasm-loader-options` change.
+  `SINGLE_FILE=1` was removed; the build emits `dist/xatlas.mjs` plus
+  `dist/xatlas.wasm`; the wrapper resolves the sibling with Emscripten's
+  `new URL('xatlas.wasm', import.meta.url)`; and the npm tarball ships the
+  `.wasm`. Node, browser/Vite and worker paths are covered by tests. The
+  license clause is deferred to XW-018, so the tarball does not yet contain a
+  root `LICENSE`.
+- **Measured after implementation (2026-11-08):** `dist/xatlas.mjs` 25,190
+  bytes (6.5 KiB gzip), `dist/xatlas.wasm` 173,401 bytes (67.3 KiB gzip), and
+  `dist/index.mjs` 49,938 bytes (10.8 KiB gzip). The packed tarball is 87.4 kB
+  with five files. The packed-package Vite consumer emitted
+  `xatlas-DTH0F__g.wasm` alongside the entry JS, reported no Node
+  externalization warning, and emitted no extra `.mjs` module chunk.
 
 #### XW-002 — Implement `createXAtlas(options)` for real
 
@@ -239,6 +256,13 @@ vendoring machinery.
   - `tsc` accepts the documented call;
   - runtime tests prove the options are forwarded.
 - **Suggested OpenSpec change:** `wasm-loader-options`
+- **Progress (2026-11-08):** implemented. `createXAtlas(options?)` validates
+  and forwards `wasmBinary`, `locateFile`, `print` and `printErr`;
+  `wasmBinary` accepts `ArrayBuffer` and any `ArrayBufferView` (normalized to
+  bytes) and wins over `locateFile`; invalid types reject with a `TypeError`
+  naming the option. `test/loader.test.mjs` covers default resolution, a custom
+  locator, binary precedence, view normalization, invalid types and a missing
+  artifact. `lib/xatlas.d.ts`, `API.md` and `README.md` describe the contract.
 
 #### XW-003 — Add Web Worker support
 
@@ -253,6 +277,12 @@ vendoring machinery.
   - the worker test meshes a small quad and returns its atlas dimensions;
   - the README/API docs show the worker import pattern.
 - **Suggested OpenSpec change:** `wasm-loader-options`
+- **Progress (2026-11-08):** implemented. The link uses
+  `ENVIRONMENT=web,node,worker`; `test/worker.test.mjs` runs a whole module
+  inside a Node worker thread, generates a quad and returns non-zero
+  dimensions and mesh counts. `README.md` and `API.md` document the browser
+  module-worker and Node `worker_threads` recipes. The kernel remains
+  single-threaded.
 
 #### XW-004 — Use a bundler-neutral JS build
 
@@ -268,6 +298,11 @@ vendoring machinery.
   - Vite emits the wasm asset without the "module externalized" warning;
   - the consumer test runs in CI.
 - **Suggested OpenSpec change:** `wasm-loader-options`
+- **Progress (2026-11-08):** implemented. `scripts/bundle.mjs` uses esbuild
+  `platform: 'neutral'` with `module`, `fs`, `path` and `url` external, and
+  rewrites Emscripten's Node-only `import("module")` to a non-literal
+  specifier. The packed-package Vite consumer emits the `.wasm` asset and fails
+  on the Node externalization warning.
 
 #### XW-005 — Decide and document the single-file trade-off
 
@@ -282,6 +317,10 @@ vendoring machinery.
 - **Acceptance criteria:** one supported default is documented; if the optional
   flavor remains, both flavors are built and tested.
 - **Suggested OpenSpec change:** `wasm-loader-options`
+- **Progress (2026-11-08):** implemented. Separate `dist/xatlas.wasm` is the
+  only supported layout; the optional single-file flavor was not retained.
+  `BUILD.md`, `README.md` and `API.md` document the sibling artifact, the
+  loader options and the worker recipes.
 
 ### 5.2 Correctness, API completeness and robustness
 
@@ -593,12 +632,12 @@ vendoring machinery.
   production build that must emit and reference a JS asset. The scratch tree
   is removed on success and kept on failure; `KEEP_PACKAGE_TEST=1` keeps it
   after success, and `TEST_PACKAGE_DROP=<file>` is a local negative hook (not
-  used in CI). The missing-`.wasm` acceptance check is deferred to XW-001: the
-  current `SINGLE_FILE=1` package has no separate asset, and the consumer test
-  intentionally does not expect one. The missing-license check is deferred to
-  XW-018: the tarball still has no root `LICENSE`. Remaining sub-items:
-  XW-018 package contents, XW-019 release flow, XW-022 lock/provenance,
-  XW-001 `.wasm`.
+  used in CI). The missing-`.wasm` acceptance check landed with
+  `wasm-loader-options`: the tarball must contain `dist/xatlas.wasm`, the Node
+  consumer resolves it, and the Vite consumer must emit it. The missing-license
+  check is deferred to XW-018: the tarball still has no root `LICENSE`.
+  Remaining sub-items: XW-018 package contents, XW-019 release flow,
+  XW-022 lock/provenance.
 - **Suggested OpenSpec change:** `build-ci-hardening` (or
   `package-release-polish`)
 
@@ -712,7 +751,10 @@ verification completed on 2026-11-08: the first `Build WASM` push run was
 green on `main` (run 42495692316) with a downloadable `xatlas-wasm-dist`
 artifact containing the build outputs and digest files; configuring the
 `build` job as a required status check is the remaining repository-settings
-follow-up. Every other change in the table remains unimplemented.
+follow-up. `wasm-loader-options` (XW-001–XW-005) is implemented on `main` with
+its planning artifacts complete and validated; it is pending review, CI
+verification and archive. XW-008 (`getImage()`) still needs its spec delta in
+`atlas-result-api`. Every other change in the table remains unimplemented.
 
 ### Notes on ordering
 
@@ -893,12 +935,13 @@ AGENTS.md              repository-specific OpenSpec workflow contract
 
 `baseline-specs` is archived and `openspec validate --all --strict` passes for
 the four baseline capabilities (`wasm-loader`, `atlas-api`, `packaging`,
-`build-ci`). `build-ci-hardening` is implemented and archived; the next
-behaviour-changing item is `wasm-loader-options`. XW-008 was delivered outside
-the workflow and still needs a spec delta (see §6).
-`README.md`, `API.md` and `BUILD.md` were updated to describe the current
-`0.1.3` behaviour and point to this backlog; they should be updated again as
-each item lands.
+`build-ci`). `build-ci-hardening` is implemented and archived;
+`wasm-loader-options` is implemented and pending review/archive, and the next
+behaviour-changing item after it is `mesh-input-validation`. XW-008 was
+delivered outside the workflow and still needs a spec delta (see §6).
+`README.md`, `API.md` and `BUILD.md` were updated to describe the separate
+`.wasm` layout and loader options and point to this backlog; they should be
+updated again as each item lands.
 
 The intended workflow for each item above is:
 

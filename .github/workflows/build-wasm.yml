@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f dist/SHA256SUMS dist/SIZES
-          files=(dist/xatlas.mjs dist/index.mjs)
+          files=(dist/xatlas.mjs dist/xatlas.wasm dist/index.mjs)
           for f in "${files[@]}"; do
             if [ ! -s "$f" ]; then
               echo "::error::Expected artifact '$f' is missing or empty"

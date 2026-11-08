@@ -367,7 +367,22 @@ export interface XAtlas {
 }
 
 /** Options for initializing the xatlas WASM module. */
-export interface CreateXAtlasOptions {}
+export interface CreateXAtlasOptions {
+  /**
+   * Explicit WASM bytes. Takes precedence over `locateFile`; when supplied,
+   * the loader does not resolve or fetch `xatlas.wasm`.
+   */
+  wasmBinary?: ArrayBuffer | ArrayBufferView;
+  /**
+   * Resolve the WASM artifact path and prefix to a URL. Only called when
+   * `wasmBinary` is not supplied.
+   */
+  locateFile?: (path: string, prefix: string) => string;
+  /** Redirect the Emscripten module's standard output. */
+  print?: (text: string) => void;
+  /** Redirect the Emscripten module's standard error. */
+  printErr?: (text: string) => void;
+}
 
 /** The xatlas module API returned by initialization. */
 export interface XAtlasModule {
@@ -393,6 +408,9 @@ export interface XAtlasModule {
 /**
  * Initialize the xatlas WASM module.
  *
+ * With no options the sibling `xatlas.wasm` is resolved beside the package
+ * entry. Pass `locateFile` for a custom URL or `wasmBinary` for explicit bytes.
+ *
  * @example
  * ```js
  * import createXAtlas from 'xatlas-wasm';
@@ -404,5 +422,14 @@ export interface XAtlasModule {
  * const mesh = atlas.getMesh(0);
  * atlas.destroy();
  * ```
+ *
+ * @example
+ * ```js
+ * const xatlas = await createXAtlas({
+ *   locateFile: (path) => `/static/wasm/${path}`,
+ * });
+ * ```
  */
-export default function createXAtlas(): Promise<XAtlasModule>;
+export default function createXAtlas(
+  options?: CreateXAtlasOptions
+): Promise<XAtlasModule>;
