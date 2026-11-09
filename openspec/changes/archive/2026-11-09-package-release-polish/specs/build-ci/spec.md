@@ -5,14 +5,10 @@
 ### Requirement: Publish workflow
 
 `.github/workflows/publish.yml` SHALL run on a published GitHub release and on
-manual `workflow_dispatch`. It SHALL resolve one release tag from
-`github.event.release.tag_name` or the manual `tag` input, check out that tag
-with submodules, use Node.js 24, install Emscripten `3.1.64` and verify the
-installed `emcc` reports exactly `3.1.64`, run `npm ci`, configure, build, the
-smoke, loader and worker tests and the packed-package consumer test, verify
-`dist/index.mjs`, `dist/xatlas.wasm` and `lib/xatlas.d.ts`, record artifact
-digests and build provenance, attach `dist/PROVENANCE.txt` to the release, and
-publish with `npm publish --provenance --access public` using
+manual `workflow_dispatch`, resolve one release tag from the release or the
+required `tag` input, check out that tag with submodules, run the pinned build
+and test suite, verify the dist artifacts, attach provenance to the release,
+and publish with `npm publish --provenance --access public` using
 `id-token: write`.
 
 #### Scenario: Published release produces an npm release
@@ -63,19 +59,15 @@ provenance.
 ### Requirement: Packed-package consumer test
 
 `npm run test:package` SHALL execute `scripts/test-package.mjs`, which SHALL
-pack the package with `npm pack`, install the tarball into a scratch project
-without registry access, run a Node consumer that generates an atlas from the
-packaged WASM, typecheck a TypeScript consumer against the packaged
-declarations (including loader options), and run a Vite production build that
-emits the WASM asset. It SHALL require `dist/index.mjs`, `dist/xatlas.wasm`,
-`lib/xatlas.d.ts`, `README.md`, `LICENSE`, `NOTICE`, `CHANGELOG.md` and
-`package.json` in the tarball and installed package, and SHALL assert the
-package manifest metadata.
+pack and install the tarball into a scratch project without registry access,
+run the Node, TypeScript and Vite consumers, require the complete package file
+set including `LICENSE`, `NOTICE` and `CHANGELOG.md`, and assert the package
+manifest metadata.
 
 #### Scenario: Consumer test passes on a packed package
 
 - **WHEN** `npm run test:package` runs on a built checkout
-- **THEN** the tarball installs in the scratch project with `dist/xatlas.wasm`, `LICENSE`, `NOTICE` and `CHANGELOG.md`, the Node consumer resolves the WASM beside the entry, the TypeScript typecheck passes, the Vite production build emits and references the WASM asset, and the manifest metadata assertions pass
+- **THEN** the tarball installs in the scratch project with `dist/xatlas.wasm`, `LICENSE`, `NOTICE` and `CHANGELOG.md`, the Node consumer resolves the WASM beside the entry, the TypeScript typecheck passes with loader options, the Vite production build emits and references the WASM asset, and the manifest metadata assertions pass
 
 #### Scenario: External tarball can be verified
 

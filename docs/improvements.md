@@ -833,7 +833,8 @@ follow-up. `wasm-loader-options` (XW-001–XW-005) is implemented and archived
 (XW-025) is implemented out of sequence: the realistic six-scenario gallery,
 worker, four views, site tests and Pages workflow are in place, and
 the package loader/API is unchanged. `package-release-polish` (XW-018,
-XW-019) is implemented as an OpenSpec change on `main`: the tarball carries
+XW-019) is implemented and archived
+(`openspec/changes/archive/2026-11-09-package-release-polish`): the tarball carries
 `LICENSE`, `NOTICE` and `CHANGELOG.md`; the publish workflow validates the
 annotated release tag, package/lockfile versions, changelog and published
 release, uses OIDC trusted publishing, skips an already-published version and
