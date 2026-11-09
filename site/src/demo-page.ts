@@ -403,6 +403,7 @@ export class DemoPage {
     this.addStat('Resolution', `${run.stats.width} × ${run.stats.height}`);
     this.addStat('Charts', formatCount(run.stats.chartCount));
     this.addStat('Atlases', String(run.stats.atlasCount));
+    this.addStat('Meshes', String(run.stats.meshCount));
 
     const utilization = el('ul', 'utilization-list');
     for (let i = 0; i < run.stats.utilization.length; i++) {

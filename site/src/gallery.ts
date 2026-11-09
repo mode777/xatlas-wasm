@@ -22,26 +22,21 @@ function demoCard(
     ACCENTS[index % ACCENTS.length] ?? ACCENTS[0]!,
   );
 
-  const visual = el('div', 'demo-card-visual');
-  visual.setAttribute('aria-hidden', 'true');
-  visual.append(el('span', 'demo-card-grid'));
-  for (let i = 0; i < 5; i++) {
-    visual.append(el('span', `demo-card-chart demo-card-chart-${i + 1}`));
-  }
-  visual.append(
+  const body = el('div', 'demo-card-body');
+  const meta = el('div', 'demo-card-meta');
+  meta.append(
     el('span', 'demo-card-ordinal', String(index + 1).padStart(2, '0')),
     el('span', 'demo-card-input', demo.meta.input),
   );
-
-  const body = el('div', 'demo-card-body');
   body.append(
+    meta,
     el('p', 'demo-card-kicker', demo.meta.features[0] ?? 'scenario'),
     el('h2', 'demo-card-title', demo.meta.title),
     el('p', 'demo-card-description', demo.meta.description),
     featureList(demo.meta.features),
   );
 
-  card.append(visual, body);
+  card.append(body);
   return card;
 }
 
@@ -73,19 +68,7 @@ export function renderGallery(): HTMLElement {
     facts.append(group);
   }
   copy.append(facts);
-
-  const board = el('div', 'hero-board');
-  board.setAttribute('aria-hidden', 'true');
-  const sheet = el('div', 'hero-board-sheet');
-  for (let i = 0; i < 7; i++) {
-    sheet.append(el('span', `hero-chart hero-chart-${i + 1}`));
-  }
-  board.append(
-    sheet,
-    el('span', 'hero-board-label', 'atlas 0 · 6 charts'),
-  );
-
-  hero.append(copy, board);
+  hero.append(copy);
 
   const grid = el('section', 'demo-grid');
   grid.setAttribute('aria-label', 'Scenarios');

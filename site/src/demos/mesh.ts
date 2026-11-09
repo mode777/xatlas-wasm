@@ -13,3 +13,15 @@ export function addMesh(context: DemoContext, input: DemoInput): DemoInput {
   });
   return input;
 }
+
+/** Add every mesh of a multi-model scenario in order. */
+export function addMeshes(
+  context: DemoContext,
+  inputs: readonly DemoInput[],
+): readonly DemoInput[] {
+  if (inputs.length === 0) {
+    throw new Error('a scenario must add at least one mesh');
+  }
+  for (const input of inputs) addMesh(context, input);
+  return inputs;
+}

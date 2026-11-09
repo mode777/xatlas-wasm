@@ -27,10 +27,11 @@ See `proposal.md` for motivation. The current state that shapes this design:
 The Cesium Milk Truck source measured for this design is the Khronos glTF
 Sample Asset at commit `8f492390ddc7a2ae221a1369ef560589cf8c70fb`:
 `CesiumMilkTruck.glb` is 369,980 bytes (SHA-256
-`09371b34608116de5842d23abe260bf11acf3e1554daf334a647eb566eee5c49`). It has
-four indexed triangle primitives totalling 3,995 positions and 8,568 indices
-(2,856 triangles), two wheel nodes and one body mesh, plus a root Y-up-to-Z-up
-rotation. Textures, materials and the animation are not needed.
+`09371b34608116de5842d23abe260bf11acf3e1554daf334a647eb566eee5c49`). Its
+three meshes produce five triangle-primitive instances: the wheel mesh is
+referenced by two nodes, so the whole truck has 4,823 positions and 10,872
+indices (3,624 triangles), plus a body mesh and a root Y-up-to-Z-up rotation.
+Textures, materials and the animation are not needed.
 
 ## Goals / Non-Goals
 

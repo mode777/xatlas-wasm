@@ -135,10 +135,6 @@ a:focus-visible {
 }
 
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 48px;
-  align-items: center;
   padding: 44px 0 56px;
 }
 
@@ -189,111 +185,6 @@ a:focus-visible {
   font-size: 0.92rem;
 }
 
-.hero-board {
-  position: relative;
-  min-height: 330px;
-  padding: 26px;
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.2)),
-    var(--paper-deep);
-  box-shadow: var(--shadow);
-  transform: rotate(1.2deg);
-}
-
-.hero-board-sheet {
-  position: relative;
-  height: 100%;
-  min-height: 276px;
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  overflow: hidden;
-  background:
-    linear-gradient(rgba(15, 111, 116, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 111, 116, 0.08) 1px, transparent 1px),
-    #faf7f0;
-  background-size: 28px 28px;
-}
-
-.hero-chart {
-  position: absolute;
-  border: 1px solid rgba(16, 23, 25, 0.2);
-  border-radius: 8px;
-  box-shadow: 0 10px 20px -14px rgba(16, 23, 25, 0.5);
-}
-
-.hero-chart-1 {
-  left: 8%;
-  top: 10%;
-  width: 38%;
-  height: 38%;
-  background: rgba(15, 111, 116, 0.72);
-  transform: rotate(-6deg);
-}
-
-.hero-chart-2 {
-  right: 9%;
-  top: 14%;
-  width: 30%;
-  height: 44%;
-  background: rgba(181, 82, 42, 0.72);
-  transform: rotate(9deg);
-}
-
-.hero-chart-3 {
-  left: 15%;
-  bottom: 10%;
-  width: 33%;
-  height: 33%;
-  background: rgba(108, 92, 231, 0.62);
-  transform: rotate(12deg);
-}
-
-.hero-chart-4 {
-  right: 18%;
-  bottom: 8%;
-  width: 22%;
-  height: 26%;
-  background: rgba(160, 106, 18, 0.65);
-  transform: rotate(-10deg);
-}
-
-.hero-chart-5 {
-  left: 47%;
-  top: 39%;
-  width: 14%;
-  height: 20%;
-  background: rgba(42, 111, 78, 0.62);
-  transform: rotate(4deg);
-}
-
-.hero-chart-6 {
-  right: 7%;
-  bottom: 43%;
-  width: 12%;
-  height: 12%;
-  background: rgba(138, 93, 118, 0.65);
-}
-
-.hero-chart-7 {
-  left: 6%;
-  bottom: 8%;
-  width: 7%;
-  height: 9%;
-  background: rgba(15, 111, 116, 0.45);
-}
-
-.hero-board-label {
-  position: absolute;
-  left: 38px;
-  bottom: 34px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-}
-
 .demo-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -324,78 +215,15 @@ a:focus-visible {
   box-shadow: 0 26px 50px -32px rgba(30, 24, 16, 0.55);
 }
 
-.demo-card-visual {
-  position: relative;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  border-bottom: 1px solid var(--line);
-  background:
-    linear-gradient(rgba(16, 23, 25, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(16, 23, 25, 0.06) 1px, transparent 1px),
-    #ece6da;
-  background-size: 22px 22px;
-}
-
-.demo-card-grid {
-  position: absolute;
-  inset: 11%;
-  border: 1px solid rgba(16, 23, 25, 0.16);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.demo-card-chart {
-  position: absolute;
-  border: 1px solid rgba(16, 23, 25, 0.18);
-  border-radius: 6px;
-  background: var(--card-accent);
-  opacity: 0.82;
-}
-
-.demo-card-chart-1 {
-  left: 16%;
-  top: 18%;
-  width: 29%;
-  height: 29%;
-  transform: rotate(-6deg);
-}
-
-.demo-card-chart-2 {
-  right: 17%;
-  top: 23%;
-  width: 23%;
-  height: 36%;
-  transform: rotate(8deg);
-}
-
-.demo-card-chart-3 {
-  left: 25%;
-  bottom: 17%;
-  width: 24%;
-  height: 22%;
-  transform: rotate(11deg);
-}
-
-.demo-card-chart-4 {
-  right: 25%;
-  bottom: 18%;
-  width: 14%;
-  height: 17%;
-  transform: rotate(-9deg);
-}
-
-.demo-card-chart-5 {
-  left: 49%;
-  top: 43%;
-  width: 15%;
-  height: 15%;
-  background: rgba(16, 23, 25, 0.3);
+.demo-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .demo-card-ordinal {
-  position: absolute;
-  left: 14px;
-  top: 12px;
   color: rgba(16, 23, 25, 0.48);
   font-family: var(--mono);
   font-size: 0.68rem;
@@ -403,13 +231,9 @@ a:focus-visible {
 }
 
 .demo-card-input {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
   padding: 3px 7px;
-  border: 1px solid rgba(16, 23, 25, 0.2);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(250, 247, 240, 0.75);
   color: var(--muted);
   font-family: var(--mono);
   font-size: 0.6rem;
@@ -418,7 +242,7 @@ a:focus-visible {
 }
 
 .demo-card-body {
-  padding: 19px 20px 21px;
+  padding: 22px 22px 24px;
 }
 
 .demo-card-kicker {
@@ -1064,17 +888,7 @@ a:focus-visible {
   }
 
   .hero {
-    grid-template-columns: 1fr;
-    gap: 30px;
     padding-top: 24px;
-  }
-
-  .hero-board {
-    min-height: 250px;
-  }
-
-  .hero-board-sheet {
-    min-height: 200px;
   }
 
   .demo-grid {

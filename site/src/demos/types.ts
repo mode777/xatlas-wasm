@@ -16,7 +16,7 @@ export interface DemoMeta {
   readonly input: 'generated' | 'asset';
 }
 
-/** What a scenario returns to the worker after adding its mesh. */
+/** What a scenario returns to the worker after adding its mesh(es). */
 export interface DemoInput {
   readonly kind: 'mesh' | 'uv';
   readonly positions?: Float32Array;
@@ -24,6 +24,9 @@ export interface DemoInput {
   readonly uvs?: Float32Array;
   readonly indices: Uint32Array;
 }
+
+/** One scenario may add a single mesh or a multi-model scene. */
+export type DemoBuildResult = DemoInput | readonly DemoInput[];
 
 /** Helpers the worker gives a scenario so it can own its xatlas calls. */
 export interface DemoContext {
@@ -33,10 +36,10 @@ export interface DemoContext {
   addUvMesh(options: UvMeshDeclOptions): void;
 }
 
-/** A pure scenario module: metadata, recipe and the mesh it unwraps. */
+/** A pure scenario module: metadata, recipe and the mesh(es) it unwraps. */
 export interface DemoDefinition {
   readonly meta: DemoMeta;
   readonly chartOptions?: ChartOptions;
   readonly packOptions?: PackOptions;
-  build(context: DemoContext): DemoInput;
+  build(context: DemoContext): DemoBuildResult;
 }

@@ -1,17 +1,17 @@
-import cube from './scenarios/cube.js';
 import gazebo from './scenarios/gazebo.js';
-import multiAtlas from './scenarios/multi-atlas.js';
-import packingLab from './scenarios/packing-lab.js';
-import terrain from './scenarios/terrain.js';
+import milkTruck from './scenarios/milk-truck.js';
+import townLevel from './scenarios/town-level.js';
 import uvSphere from './scenarios/uv-sphere.js';
+import packingLab from './scenarios/packing-lab.js';
+import multiAtlas from './scenarios/multi-atlas.js';
 import type { DemoDefinition, DemoMeta } from './types.js';
 
 /** The showcase catalog. Scenario modules stay free of DOM and three.js. */
 export const demos: readonly DemoDefinition[] = [
   gazebo,
-  cube,
+  milkTruck,
+  townLevel,
   uvSphere,
-  terrain,
   packingLab,
   multiAtlas,
 ];

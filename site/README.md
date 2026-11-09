@@ -1,7 +1,10 @@
 # xatlas-wasm showcase
 
-The public demo gallery for `xatlas-wasm`: six mesh-unwrapping scenarios with
-3D, UV, atlas and source views, running the real WebAssembly build in a worker.
+The public demo gallery for `xatlas-wasm`: six realistic mesh-unwrapping
+scenarios with 3D, UV, atlas and source views, running the real WebAssembly
+build in a worker. The catalog is `gazebo`, `milk-truck`, `town-level`,
+`uv-sphere`, `packing-lab` and `multi-atlas`; `town-level` composes several
+models into one multi-mesh scene.
 
 This directory is a **separate consumer** of the package. It is not part of the
 npm tarball, and it always links the local package (`xatlas-wasm: file:..`) —
@@ -81,11 +84,24 @@ const demo: DemoDefinition = {
 export default demo;
 ```
 
+A scenario may return one mesh or an array. For a multi-model scene, use the
+`addMeshes` helper so every mesh is added in order:
+
+```ts
+import { addMeshes } from '../mesh.js';
+
+build(context) {
+  return addMeshes(context, [ground, buildings, truck]);
+}
+```
+
 Rules:
 
 - `id` is stable, kebab-case and matches the module filename.
-- `build` owns the `addMesh`/`addUvMesh` call. The worker owns the atlas, sets
+- `build` owns the `addMesh`/`addUvMesh` calls. The worker owns the atlas, sets
   the progress callback, calls `generate`, and destroys the atlas.
+- A multi-mesh scenario must return the inputs in the same order it added them;
+  the worker flattens every `getMesh(i)` result into one combined result.
 - Modules must not import the DOM, three.js or Vite-only `?raw` modules. The
   Node validation suite imports them directly.
 - Keep generated meshes modest: `getMesh()` returns one object per output
@@ -108,11 +124,11 @@ The module worker initializes `createXAtlas()` once and reuses it for every
 run. For each run it:
 
 1. creates an atlas and registers a progress callback;
-2. calls the scenario's `build(context)`, which adds the mesh;
+2. calls the scenario's `build(context)`, which adds one or more meshes;
 3. calls `atlas.generate(chartOptions, packOptions)`;
-4. copies `getMesh(0)` and `getImage()` into flat typed arrays
+4. copies every `getMesh(i)` and `getImage()` into flat typed arrays
    (`positions`, normalised `uvs`, `chartIds`, `atlasIds`, `indices`) plus
-   statistics;
+   per-mesh offsets and statistics;
 5. destroys the atlas and posts the arrays with transferables.
 
 The main thread never holds a wasm object. The 3D viewport, UV canvas, atlas
@@ -121,10 +137,26 @@ views never re-runs the unwrap.
 
 ## Assets and licensing
 
-The only external model is `gazebo.obj` from the pinned upstream xatlas
-submodule. It is MIT licensed and copied into
-`src/demos/assets/gazebo.ts`; see `src/demos/assets/NOTICE.md`. All other
-scenarios generate their meshes in TypeScript.
+Two external models are embedded as source modules; see
+`src/demos/assets/NOTICE.md` for the full provenance:
+
+- `gazebo.obj` from the pinned upstream xatlas submodule (MIT), copied into
+  `src/demos/assets/gazebo.ts`.
+- `CesiumMilkTruck.glb` from Khronos glTF Sample Assets (CC BY 4.0), extracted
+  into `src/demos/assets/milk-truck.ts`.
+
+The Milk Truck module contains only positions and indices; textures, materials,
+animation and the Cesium logo texture are not used. Regenerate it from a local
+copy of the GLB with:
+
+```sh
+node scripts/embed-glb.mjs /path/to/CesiumMilkTruck.glb \
+  src/demos/assets/milk-truck.ts
+```
+
+The extraction script applies the glTF scene-node world transforms and records
+the source URL, commit, license, copyright and SHA-256. `town-level` reuses the
+Gazebo and Milk Truck and generates its remaining town fabric in TypeScript.
 
 ## Deployment
 

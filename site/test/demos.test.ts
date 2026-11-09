@@ -1,6 +1,11 @@
 import createXAtlas, { type XAtlasModule } from 'xatlas-wasm';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { demos } from '../src/demos/index.js';
+import { gazeboObj } from '../src/demos/assets/gazebo.js';
+import { milkTruckGeometry } from '../src/demos/assets/milk-truck.js';
+import { demos, getDemo } from '../src/demos/index.js';
+import { parseObjInput } from '../src/demos/obj.js';
+import { createTownLevel } from '../src/demos/town.js';
+import type { DemoInput } from '../src/demos/types.js';
 import { runScenario } from '../src/worker/run-scenario.js';
 
 let xatlas: XAtlasModule;
@@ -54,9 +59,32 @@ describe('scenario unwrapping', () => {
   }
 
   it('multi-atlas produces more than one sub-atlas', () => {
-    const demo = demos.find((entry) => entry.meta.id === 'multi-atlas');
+    const demo = getDemo('multi-atlas');
     expect(demo).toBeDefined();
     const run = runScenario(xatlas, demo!);
     expect(run.stats.atlasCount).toBeGreaterThan(1);
+  });
+
+  it('town-level adds every composed mesh to the atlas', () => {
+    const demo = getDemo('town-level');
+    expect(demo).toBeDefined();
+    const truck: DemoInput = {
+      kind: 'mesh',
+      positions: milkTruckGeometry.positions,
+      indices: milkTruckGeometry.indices,
+    };
+    const level = createTownLevel(parseObjInput(gazeboObj), truck);
+    const run = runScenario(xatlas, demo!);
+
+    expect(level.length).toBeGreaterThan(1);
+    expect(run.stats.meshCount).toBe(level.length);
+    expect(run.stats.inputVertexCount).toBe(
+      level.reduce((total, mesh) => total + mesh.positions!.length / 3, 0),
+    );
+    expect(run.stats.inputFaceCount).toBe(
+      level.reduce((total, mesh) => total + mesh.indices.length / 3, 0),
+    );
+    expect(run.stats.outputVertexCount).toBe(run.positions.length / 3);
+    expect(run.stats.outputIndexCount).toBe(run.indices.length);
   });
 });

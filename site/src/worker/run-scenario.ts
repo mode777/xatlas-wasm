@@ -1,12 +1,13 @@
 import type {
   AtlasImage,
   Chart,
+  Mesh,
   MeshDeclOptions,
   UvMeshDeclOptions,
   XAtlas,
   XAtlasModule,
 } from 'xatlas-wasm';
-import type { DemoDefinition } from '../demos/types.js';
+import type { DemoDefinition, DemoInput } from '../demos/types.js';
 
 export interface ScenarioChart {
   readonly atlasIndex: number;
@@ -70,6 +71,21 @@ function chartInfo(chart: Chart): ScenarioChart {
   };
 }
 
+function normaliseInputs(
+  input: DemoInput | readonly DemoInput[],
+): readonly DemoInput[] {
+  const inputs = Array.isArray(input) ? input : [input];
+  if (inputs.length === 0) {
+    throw new Error('scenario added no meshes');
+  }
+  for (const [index, entry] of inputs.entries()) {
+    if (entry.kind !== 'mesh' || !entry.positions) {
+      throw new Error(`scenario mesh ${index} requires positions`);
+    }
+  }
+  return inputs;
+}
+
 /**
  * Run one scenario against one module instance. The atlas is always destroyed
  * in `finally`; the returned arrays are copies owned by the caller.
@@ -108,33 +124,68 @@ export function runScenario(
       });
     }
 
-    const input = demo.build({ xatlas, atlas, addMesh, addUvMesh });
-    if (input.kind !== 'mesh' || !input.positions) {
-      throw new Error('only mesh scenarios are supported in this showcase');
-    }
-
+    const inputs = normaliseInputs(
+      demo.build({ xatlas, atlas, addMesh, addUvMesh }),
+    );
     atlas.generate(demo.chartOptions, demo.packOptions);
 
-    const mesh = atlas.getMesh(0);
+    if (atlas.meshCount !== inputs.length) {
+      throw new Error(
+        `scenario added ${inputs.length} meshes but the atlas reports ${atlas.meshCount}`,
+      );
+    }
+
+    const meshes: {
+      readonly mesh: Mesh;
+      readonly input: DemoInput;
+    }[] = [];
+    let outputVertexCount = 0;
+    let outputIndexCount = 0;
+    let inputVertexCount = 0;
+    let inputFaceCount = 0;
+
+    for (let index = 0; index < inputs.length; index++) {
+      const input = inputs[index]!;
+      const mesh = atlas.getMesh(index);
+      if (mesh.vertexCount === 0 || mesh.indexCount === 0) {
+        throw new Error(`scenario mesh ${index} produced no output`);
+      }
+      meshes.push({ mesh, input });
+      outputVertexCount += mesh.vertexCount;
+      outputIndexCount += mesh.indexCount;
+      inputVertexCount += input.positions!.length / 3;
+      inputFaceCount += input.indices.length / 3;
+    }
+
     const width = atlas.width;
     const height = atlas.height;
-    const vertexCount = mesh.vertexCount;
+    const positions = new Float32Array(outputVertexCount * 3);
+    const uvs = new Float32Array(outputVertexCount * 2);
+    const chartIds = new Int32Array(outputVertexCount);
+    const atlasIds = new Int32Array(outputVertexCount);
+    const indices = new Uint32Array(outputIndexCount);
+    const charts: ScenarioChart[] = [];
 
-    const positions = new Float32Array(vertexCount * 3);
-    const uvs = new Float32Array(vertexCount * 2);
-    const chartIds = new Int32Array(vertexCount);
-    const atlasIds = new Int32Array(vertexCount);
-
-    for (let i = 0; i < vertexCount; i++) {
-      const vertex = mesh.vertices[i]!;
-      const source = vertex.xref * 3;
-      positions[i * 3] = input.positions[source]!;
-      positions[i * 3 + 1] = input.positions[source + 1]!;
-      positions[i * 3 + 2] = input.positions[source + 2]!;
-      uvs[i * 2] = width > 0 ? vertex.uv[0] / width : 0;
-      uvs[i * 2 + 1] = height > 0 ? vertex.uv[1] / height : 0;
-      chartIds[i] = vertex.chartIndex;
-      atlasIds[i] = vertex.atlasIndex;
+    let vertexOffset = 0;
+    let indexOffset = 0;
+    for (const { mesh, input } of meshes) {
+      for (let i = 0; i < mesh.vertexCount; i++) {
+        const vertex = mesh.vertices[i]!;
+        const source = vertex.xref * 3;
+        positions[(vertexOffset + i) * 3] = input.positions![source]!;
+        positions[(vertexOffset + i) * 3 + 1] = input.positions![source + 1]!;
+        positions[(vertexOffset + i) * 3 + 2] = input.positions![source + 2]!;
+        uvs[(vertexOffset + i) * 2] = width > 0 ? vertex.uv[0] / width : 0;
+        uvs[(vertexOffset + i) * 2 + 1] = height > 0 ? vertex.uv[1] / height : 0;
+        chartIds[vertexOffset + i] = vertex.chartIndex;
+        atlasIds[vertexOffset + i] = vertex.atlasIndex;
+      }
+      for (let i = 0; i < mesh.indexCount; i++) {
+        indices[indexOffset + i] = mesh.indices[i]! + vertexOffset;
+      }
+      charts.push(...mesh.charts.map(chartInfo));
+      vertexOffset += mesh.vertexCount;
+      indexOffset += mesh.indexCount;
     }
 
     const utilization: number[] = [];
@@ -148,9 +199,9 @@ export function runScenario(
       uvs,
       chartIds,
       atlasIds,
-      indices: mesh.indices,
+      indices,
       image: copyImage(atlas.getImage()),
-      charts: mesh.charts.map(chartInfo),
+      charts,
       stats: {
         width,
         height,
@@ -159,10 +210,10 @@ export function runScenario(
         meshCount: atlas.meshCount,
         texelsPerUnit: atlas.texelsPerUnit,
         utilization,
-        inputVertexCount: input.positions.length / 3,
-        inputFaceCount: input.indices.length / 3,
-        outputVertexCount: mesh.vertexCount,
-        outputIndexCount: mesh.indexCount,
+        inputVertexCount,
+        inputFaceCount,
+        outputVertexCount,
+        outputIndexCount,
         durationMs: performance.now() - started,
       },
     };

@@ -728,29 +728,41 @@ vendoring machinery.
   chart and packing options change a real unwrap.
 - **Proposed:** add a separate Vite + TypeScript showcase under `site/` that
   consumes the local package (`file:..`) and presents six scenarios (gazebo,
-  cube, UV sphere, terrain, packing lab and multi-atlas). Each scenario page
-  provides 3D, UV, Atlas and Code views, run statistics, the chart/pack recipe,
-  and OBJ/atlas-PNG downloads. A module worker owns the atlas, reports progress,
-  flattens results and destroys the atlas. Site-local Vitest unwraps every
-  scenario; a `site` job in Build WASM typechecks, tests and builds with the
-  Pages base path; `pages.yml` deploys the tested `xatlas-wasm-dist` artifact.
-  The showcase is not part of the npm tarball.
+  Cesium Milk Truck, town level, UV sphere, packing lab and multi-atlas). Each
+  scenario page provides 3D, UV, Atlas and Code views, run statistics, the
+  chart/pack recipe, and OBJ/atlas-PNG downloads. A module worker owns the
+  atlas, reports progress, flattens results and destroys the atlas. Site-local
+  Vitest unwraps every scenario; a `site` job in Build WASM typechecks, tests
+  and builds with the Pages base path; `pages.yml` deploys the tested
+  `xatlas-wasm-dist` artifact. The showcase is not part of the npm tarball.
 - **Acceptance criteria:** every scenario unwraps to non-empty finite geometry
   with UVs inside the atlas; the multi-atlas scenario produces more than one
-  sub-atlas; the production build emits a referenced hashed `xatlas.wasm`; CI
-  runs the site checks on push/PR; Pages deploys from the tested artifact.
+  sub-atlas; the town-level scenario adds multiple meshes and reports a mesh
+  count greater than one; the production build emits a referenced hashed
+  `xatlas.wasm`; CI runs the site checks on push/PR; Pages deploys from the
+  tested artifact.
 - **Progress (2026-11-08):** implemented by the `showcase-site` OpenSpec change.
   Six scenarios, the four views, display modes, statistics, downloads, the
   worker, site tests, the `site` CI job and the Pages workflow are in place.
   Measured production output: 173,401-byte wasm (69.53 KB gzip), 573.5 KB lazy
-  demo chunk (142.9 KB gzip), 29.0 KB lazy code chunk (11.2 KB gzip). Archive
-  follows review.
-- **Follow-ups:** `showcase-gallery` (10–12 scenarios, filters, coverage,
-  option presets, chart highlighting, UV repack), `showcase-docs` (in-site
-  guides and rendered `API.md`) and `showcase-thumbnails` (captured previews).
-  File upload waits for XW-006; the stress/cancel scenario waits for XW-011 and
-  XW-014.
-- **Suggested OpenSpec change:** `showcase-site`
+  demo chunk (142.9 KB gzip), 29.0 KB lazy code chunk (11.2 KB gzip).
+- **Progress (2026-11-09):** the `showcase-realistic-scenarios` follow-up
+  replaced cube/terrain with the Cesium Milk Truck and a multi-model town level,
+  removed the fabricated gallery preview art, and taught the worker to flatten
+  every `getMesh(i)` result. The town level adds 7 meshes and unwraps 7,003
+  input vertices / 5,254 faces to 8,306 output vertices / 15,762 indices,
+  1,066 charts and one 1069 × 1067 atlas in about 0.8 s. Production sizes:
+  the demo chunk is 574,218 bytes (143.04 KB gzip), the worker chunk carrying
+  the embedded geometry is 281,964 bytes (67.59 KB gzip), the entry is 265,812
+  bytes (62.86 KB gzip) and the wasm remains 173,401 bytes (69.53 KB gzip).
+- **Follow-ups:** the realistic-scenario subset of `showcase-gallery` is done;
+  the remaining gallery work is 10–12 scenarios, filters, coverage, option
+  presets, chart highlighting and UV repack. `showcase-docs` (in-site guides and
+  rendered `API.md`) and `showcase-thumbnails` (captured previews) remain
+  separate. File upload waits for XW-006; the stress/cancel scenario waits for
+  XW-011 and XW-014.
+- **Suggested OpenSpec change:** `showcase-site` (delivered) and
+  `showcase-realistic-scenarios` (content refresh)
 
 ---
 
@@ -792,8 +804,8 @@ artifact containing the build outputs and digest files; configuring the
 follow-up. `wasm-loader-options` (XW-001–XW-005) is implemented and archived
 (`openspec/changes/archive/2026-11-08-wasm-loader-options`, with the
 `wasm-loader`, `packaging` and `build-ci` specs synced). `showcase-site`
-(XW-025) is implemented out of sequence by the current change: the six-scenario
-gallery, worker, four views, site tests and Pages workflow are in place, and
+(XW-025) is implemented out of sequence: the realistic six-scenario gallery,
+worker, four views, site tests and Pages workflow are in place, and
 the package loader/API is unchanged. XW-008 (`getImage()`) still needs its spec
 delta in `atlas-result-api`. Every other change in the table remains
 unimplemented.
@@ -948,8 +960,9 @@ The build still succeeds; the warning is a symptom of `--platform=node`.
 - Adding pthreads/SharedArrayBuffer support in this sequence.
 - Changing xatlas's atlas-generation algorithm or output semantics.
 - Reproducing libfive's full OpenSpec/ADR/showcase apparatus. The
-  `showcase-site` change (XW-025) deliberately adds a six-scenario gallery;
-  ADRs, in-site documentation and thumbnails remain separate follow-ups. Adopt
+  `showcase-site` change (XW-025) deliberately adds a realistic six-scenario
+  gallery; ADRs, in-site documentation and thumbnails remain separate
+  follow-ups. Adopt
   the patterns that reduce risk; skip the parts that only add ceremony for a
   1,000-line wrapper.
 

@@ -24,13 +24,19 @@ describe('hash routing', () => {
 });
 
 describe('gallery shell', () => {
-  it('renders one card per catalog scenario', () => {
+  it('renders one text-only card per catalog scenario', () => {
     const page = renderGallery();
     expect(page.querySelectorAll('.demo-card')).toHaveLength(6);
     expect(page.querySelector('.hero-title')?.textContent).toContain(
       'UV unwrapping',
     );
     expect(page.querySelectorAll('.demo-card-input')).toHaveLength(6);
+    expect(page.querySelectorAll('.demo-card-title')).toHaveLength(6);
+    expect(page.querySelectorAll('.demo-card-description')).toHaveLength(6);
+    expect(page.querySelector('.demo-card-visual')).toBeNull();
+    expect(page.querySelector('.hero-board')).toBeNull();
+    expect(page.querySelector('img')).toBeNull();
+    expect(page.querySelector('canvas')).toBeNull();
   });
 
   it('renders the not-found page', () => {

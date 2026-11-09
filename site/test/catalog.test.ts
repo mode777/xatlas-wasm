@@ -3,9 +3,9 @@ import { demoMetaList, demos, getDemo } from '../src/demos/index.js';
 
 const expectedIds = [
   'gazebo',
-  'cube',
+  'milk-truck',
+  'town-level',
   'uv-sphere',
-  'terrain',
   'packing-lab',
   'multi-atlas',
 ];
