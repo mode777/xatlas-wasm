@@ -1,0 +1,38 @@
+# Tasks
+
+## 1. Package contents and manifest
+
+- [x] 1.1 Add a root `LICENSE` with the xatlas-wasm MIT license and a `NOTICE` reproducing the upstream xatlas MIT license and copyright (`thirdparty/xatlas/LICENSE`, 2018-2020 Jonathan Young); add both to `package.json#files`; verify `npx npm pack --dry-run --json` lists `LICENSE` and `NOTICE` and `git diff --check` reports no whitespace errors.
+- [x] 1.2 Add `CHANGELOG.md` with a Keep a Changelog `Unreleased` section and sections for `0.1.0` through `0.1.3`; add it to `package.json#files`; verify the headings with `rg -n '^## \\[(Unreleased|0\\.1\\.[0-3])\\]' CHANGELOG.md` and confirm `npm pack --dry-run` includes the file.
+- [x] 1.3 Update `package.json` with `sideEffects: false`, `types` before `import` in `exports["."]`, `publishConfig.access: "public"`, and the final file list; keep `engines.node` at `>=16.0.0`; verify the fields with `node -e`, run `npm install --package-lock-only --ignore-scripts`, and confirm the lockfile stays consistent with the manifest.
+- [x] 1.4 Update `README.md` so API, build, changelog, license and notice links are absolute and remove the "test does not require a root LICENSE" caveat; update `BUILD.md` package-contents text; verify no relative links to repository-only documents remain and the license section names both the package and upstream licenses.
+- [x] 1.5 Add `test/manifest.test.mjs` asserting the exact `files` list, `sideEffects`, `types` condition order, `publishConfig.access`, `engines.node`, changelog headings and README link rules; add it to the `npm test` script; verify `node test/manifest.test.mjs` passes and a temporary incorrect field makes it fail with a named assertion.
+- [x] 1.6 Extend `scripts/test-package.mjs` to require `LICENSE`, `NOTICE` and `CHANGELOG.md` in both the tarball and the installed package and to assert the package manifest metadata; verify `npm run test:package` passes and `TEST_PACKAGE_DROP=LICENSE`, `TEST_PACKAGE_DROP=NOTICE` and `TEST_PACKAGE_DROP=CHANGELOG.md` each fail with the missing file named.
+- [x] 1.7 Confirm `lib/xatlas.d.ts` and `API.md` need no changes for this package-only work and the packed TypeScript consumer still resolves the declarations; verify `git diff -- lib/xatlas.d.ts API.md` is empty and the `test:package` typecheck stage passes.
+- [x] 1.8 Run `npx npm pack --dry-run --json` and `npm publish --dry-run --ignore-scripts`; verify the tarball contains the intended files, excludes `API.md`, `BUILD.md` and `dist/xatlas.mjs`, and the publish dry run reports no missing-file warnings.
+
+## 2. Release tag validation and publish flow
+
+- [x] 2.1 Add `scripts/verify-release-tag.mjs` with a `--root` fixture option; require the tag to equal `v<package.json version>`, the lockfile version to match `package.json`, and `CHANGELOG.md` to contain a section for the version; verify `node scripts/verify-release-tag.mjs v0.1.3` passes and `v9.9.9` fails with a clear message.
+- [x] 2.2 Add `test/release-tag.test.mjs` with temporary fixtures for a matching tag, tag mismatch, missing `v` prefix, lockfile mismatch and missing changelog section; add it to `npm test`; verify every negative case exits non-zero with its expected message.
+- [x] 2.3 Update `.github/workflows/publish.yml` to add a required `workflow_dispatch.inputs.tag`, resolve `RELEASE_TAG` from the release event or input, check out that ref with `fetch-depth: 0` and submodules, run `verify-release-tag.mjs`, check the tag is annotated with `git cat-file -t`, check a published non-draft release with `gh release view`, and use `RELEASE_TAG` for the provenance upload and provenance file; verify the YAML parses with `npx --yes prettier@3 --check .github/workflows/publish.yml` and the validation logic matches the script fixtures.
+- [x] 2.4 Replace the unconditional `npm publish` with an idempotent check: skip publishing when `npm view xatlas-wasm@<version> version` succeeds, publish otherwise; verify locally that `npm view xatlas-wasm@0.1.3 version` succeeds and a nonexistent version exits non-zero, and confirm both workflow branches are handled.
+- [x] 2.5 Add `scripts/verify-published.mjs` with bounded registry polling, registry tarball download and clean-install verification through `TEST_PACKAGE_TARBALL`, plus a local `--tarball` test mode; add `TEST_PACKAGE_TARBALL` support to `scripts/test-package.mjs`; verify a locally packed tarball passes with `TEST_PACKAGE_TARBALL=<tgz> npm run test:package` and `node scripts/verify-published.mjs --tarball <tgz> --version 0.1.3` passes without registry access.
+- [x] 2.6 Add the post-publish verification step to `.github/workflows/publish.yml` after the publish/idempotent-skip step; verify the workflow ordering is validation, build/tests, provenance upload, publish-or-skip, registry verification, and that a failure in any earlier step prevents later ones.
+- [x] 2.7 Update `BUILD.md` with the release procedure: bump `package.json` and `package-lock.json`, write the changelog section, create and push an annotated `v<version>` tag, create the GitHub release with `gh release create --verify-tag`, retry with `workflow_dispatch` and the tag, and verify the published package; verify every command matches the workflow and the documented tag format.
+- [x] 2.8 Document trusted publishing/OIDC (no stored `NPM_TOKEN`), the registry verification, and the recommended repository settings (tag protection, required build check, optional protected environment) in `BUILD.md`; verify the workflow permissions (`contents: write`, `id-token: write`) and the documentation agree.
+- [x] 2.9 Update `docs/improvements.md` to mark XW-018 and XW-019 implemented, record that the XW-020 missing-license check is closed, note the change name and date, and list any remaining release follow-ups; verify the XW entries read as implemented and no stale "no LICENSE" text remains in `README.md`, `BUILD.md` or `docs/improvements.md`.
+
+## 3. Integration verification
+
+- [x] 3.1 Build from a clean configured checkout, then run `npm test` (manifest, release-tag, smoke, loader and worker) and `npm run test:package`; verify both commands pass.
+- [x] 3.2 Run `openspec validate --all --strict`; verify every spec and this change passes.
+- [x] 3.3 Run `npx npm pack --dry-run --json` and inspect the file list; verify it contains `LICENSE`, `NOTICE`, `CHANGELOG.md`, `dist/index.mjs`, `dist/xatlas.wasm`, `lib/xatlas.d.ts`, `README.md` and `package.json`, with no `API.md`, `BUILD.md` or `dist/xatlas.mjs`.
+- [x] 3.4 Run the negative checks: `node scripts/verify-release-tag.mjs v9.9.9` fails; a lightweight tag in a temporary repository fails the annotated-tag check; `TEST_PACKAGE_DROP` for `LICENSE`, `NOTICE` and `CHANGELOG.md` each fails with the missing file named; verify the errors are actionable.
+- [x] 3.5 Verify `git status` shows only the intended source, documentation, script and spec changes, no tracked `build/` or `dist/` outputs, and `git diff --check` is clean.
+- [x] 3.6 Review the final diff against the specs and design; verify there is no loader/API/runtime dependency change and `engines.node` remains `>=16.0.0`.
+
+## Workflow follow-up
+
+- After this change lands on `main`, prepare the next version (bump `package.json` and `package-lock.json`, add the changelog section), create an annotated tag and GitHub release, and exercise the new release workflow end to end. Verify tag validation, provenance upload, publish/idempotent skip and registry verification; record the run in `docs/improvements.md`.
+- Archive the change after review and after the release verification is recorded; if the release is deferred, record the remaining release step explicitly in `docs/improvements.md`.

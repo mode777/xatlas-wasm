@@ -105,7 +105,8 @@ npm run test:package
 scratch project under the OS temp directory (not in the repository), and then:
 
 - checks the tarball contains `dist/index.mjs`, `dist/xatlas.wasm`,
-  `lib/xatlas.d.ts`, `README.md` and `package.json`;
+  `lib/xatlas.d.ts`, `README.md`, `LICENSE`, `NOTICE`, `CHANGELOG.md` and
+  `package.json`;
 - runs a Node consumer that imports the installed package, resolves the
   sibling WASM, generates an atlas with `createImage: true` and checks
   `getImage()`;
@@ -124,9 +125,10 @@ check.
 
 `npm run bundle` uses `scripts/bundle.mjs` with esbuild `--platform=neutral`.
 Emscripten's Node-only `import("module")` is rewritten to a non-literal
-specifier so Vite does not externalize it for browser consumers. The package
-does not yet contain a root `LICENSE`; adding it is XW-018. See
-[`docs/improvements.md`](docs/improvements.md).
+specifier so Vite does not externalize it for browser consumers. The published
+package includes the root `LICENSE`, the upstream xatlas `NOTICE` and
+`CHANGELOG.md`. See [`docs/improvements.md`](docs/improvements.md) for the
+release history.
 
 ## Clean
 
@@ -146,8 +148,8 @@ PowerShell/cmd has no `rm -rf`.
 | `npm run prebuild` | Internal `build` hook: configure when `build/CMakeCache.txt` is missing and ensure `dist/` exists |
 | `npm run build`    | Auto-configure if needed, build WASM, then bundle into `dist/index.mjs` |
 | `npm run bundle`   | Bundle `lib/xatlas.mjs` + Emscripten glue with the neutral esbuild config |
-| `npm test`         | Run the Node smoke, loader-options and worker tests |
-| `npm run test:package` | Pack the tarball and run the Node/TypeScript/Vite consumer test |
+| `npm test`         | Run the manifest, release-tag, smoke, loader-options and worker tests |
+| `npm run test:package` | Pack the tarball and run the Node/TypeScript/Vite consumer test, including license, notice, changelog and manifest checks |
 | `npm run clean`    | Remove `build/` and `dist/` with `rm -rf` (Unix-like shell) |
 | `npm run example`  | Serve the browser example on port 3000 |
 
@@ -158,12 +160,14 @@ Three GitHub Actions workflows cover the build, publish and showcase deployment:
 | Workflow | Trigger | Behaviour |
 |---|---|---|
 | `Build WASM` (`.github/workflows/build-wasm.yml`) | pushes to `main` and all pull requests | Checks out submodules, uses Node 24, installs Emscripten 3.1.64 (asserting `emcc --version`), runs `npm ci`, configure, build, `npm test` and `npm run test:package`, then writes `dist/SHA256SUMS`/`dist/SIZES` and the job summary and uploads `dist/` as the `xatlas-wasm-dist` artifact (14-day retention). A dependent `site` job downloads that same artifact, typechecks, tests and builds the showcase with `SITE_BASE=/xatlas-wasm/`, and verifies the emitted wasm asset. |
-| `Build & Publish to npm` (`.github/workflows/publish.yml`) | published releases and `workflow_dispatch` | Runs the same pinned build and both test suites, computes the digests/sizes, generates `dist/PROVENANCE.txt` (Emscripten and Node versions, source commit, `thirdparty/xatlas` commit, digests/sizes), attaches it to the release with `gh release upload`, then runs `npm publish --provenance --access public`. |
+| `Build & Publish to npm` (`.github/workflows/publish.yml`) | published releases and `workflow_dispatch` with a release `tag` input | Validates the annotated tag, package/lockfile versions, changelog section and non-draft GitHub release before building. Runs the same pinned build and both test suites, computes the digests/sizes, generates `dist/PROVENANCE.txt` (release tag, Emscripten and Node versions, source commit, `thirdparty/xatlas` commit, digests/sizes), attaches it to the release with `gh release upload`, publishes with `npm publish --provenance --access public` (or skips an already-published version), then verifies the registry tarball. |
 | `pages` (`.github/workflows/pages.yml`) | completion of a successful `Build WASM` push to `main` | Checks out the tested revision, downloads its `xatlas-wasm-dist` artifact, builds the showcase with `SITE_BASE=/xatlas-wasm/`, verifies the wasm asset, and deploys `site/dist` to GitHub Pages. Requires Pages to be enabled with the GitHub Actions source. |
 
 Both build workflows use `mymindstorm/setup-emsdk@v14` with `version: 3.1.64`
-and fail before configure if `emcc` reports anything else. The publish job attaches
-provenance before publishing, so an upload failure prevents the release.
+and fail before configure if `emcc` reports anything else. The publish job
+validates the tag, lockfile, changelog and published release before building,
+then attaches provenance before publishing, so an upload failure prevents the
+release.
 
 The `build` job in `Build WASM` is intended to be a **required status check**
 for `main`, so a failing run blocks a pull request from merging. That is a
@@ -171,6 +175,103 @@ repository-settings action, not a file in this repository:
 GitHub → **Settings → Branches → Branch protection rules** for `main` → add
 `build` under required status checks. Without that setting the workflow still
 runs, but merge blocking is not enforced.
+
+## Releasing
+
+The npm package is published only from the `Build & Publish to npm` workflow.
+The workflow is tag-gated: it validates the release tag, package and lockfile
+versions, changelog section, annotated tag and published GitHub release before
+it builds or publishes.
+
+1. **Bump the version and changelog.** Keep `package.json` and
+   `package-lock.json` in sync and add a changelog section for the release:
+
+   ```sh
+   version=0.2.0   # replace with the release version
+   npm version "$version" --no-git-tag-version
+   ```
+
+   Add `## [$version] - YYYY-MM-DD` to `CHANGELOG.md` and move the relevant
+   `Unreleased` entries under it. The workflow fails if the section is missing.
+
+2. **Commit and push `main`.** Wait for the `Build WASM` push run to pass:
+
+   ```sh
+   git add package.json package-lock.json CHANGELOG.md
+   git commit -m "release $version"
+   git push origin main
+   gh run list --workflow "Build WASM" --branch main --limit 1
+   ```
+
+3. **Create and push an annotated tag.** The tag must be
+   `v<package.json version>` and must be annotated:
+
+   ```sh
+   git tag -a "v$version" -m "xatlas-wasm $version"
+   git push origin "v$version"
+   ```
+
+4. **Create the GitHub release.** Use `--verify-tag` so the release points at
+   the annotated tag you just pushed. Put the changelog section in the release
+   notes (`--notes-file` or the GitHub UI):
+
+   ```sh
+   gh release create "v$version" --verify-tag \
+     --title "v$version" --notes-file release-notes.md
+   ```
+
+   Publishing the release triggers `Build & Publish to npm`. Watch the run:
+
+   ```sh
+   gh run list --workflow "Build & Publish to npm" --limit 1
+   gh run watch <run-id>
+   ```
+
+5. **Verify the published package.** The workflow verifies the registry
+   tarball after publishing. You can repeat the check locally:
+
+   ```sh
+   npm view "xatlas-wasm@$version" version
+   node scripts/verify-published.mjs "v$version"
+   ```
+
+6. **Retry safely.** If a pre-publish step fails, fix the cause and re-run the
+   workflow. If post-publish verification fails, re-run `workflow_dispatch`
+   with the release tag; the workflow skips the already-published version and
+   re-runs verification:
+
+   ```sh
+   gh workflow run publish.yml --ref main -f tag="v$version"
+   ```
+
+   The `workflow_dispatch` input must be an existing published release tag; a
+   branch name such as `main` is rejected before the build. The workflow uses
+   trusted publishing/OIDC and does not read a stored `NPM_TOKEN`.
+
+### Trusted publishing and repository settings
+
+- **npm trusted publisher.** Configure the package on npmjs.com with the
+  GitHub repository `mode777/xatlas-wasm` and workflow filename `publish.yml`.
+  The workflow requests `id-token: write` and runs
+  `npm publish --provenance --access public`; no `NPM_TOKEN` secret is needed.
+  The filename is part of the npm trust configuration, so do not rename it
+  without updating the npm package settings.
+- **Workflow permissions.** The publish workflow requests `contents: write`
+  to attach `dist/PROVENANCE.txt` to the GitHub release and `id-token: write`
+  for OIDC. It does not request any other write permission.
+- **Tag protection.** Protect the `v*` tag pattern so only maintainers can
+  create or delete release tags. The workflow additionally requires the tag to
+  be annotated and to match `package.json`.
+- **Required build check.** Keep the `build` job in `Build WASM` as a required
+  status check for `main` (see [Continuous integration](#continuous-integration)).
+- **Protected environment (optional).** A protected `npm-publish` environment
+  can add reviewer approval. If you add it, select the same environment in the
+  npm trusted publisher configuration and add `environment: npm-publish` to the
+  publish job; that workflow change is a separate follow-up.
+- **Registry verification.** After publishing, the workflow runs
+  `node scripts/verify-published.mjs "$RELEASE_TAG"`, which polls the public
+  registry, downloads the registry tarball and runs the packed-package
+  consumer against it. The same command works locally for an existing release.
 
 ## Browser example
 

@@ -8,6 +8,7 @@
  * install uses only the local tarball; no registry access is required.
  *
  * Usage: node scripts/test-package.mjs
+ * Verify an existing tarball: TEST_PACKAGE_TARBALL=/path/to/package.tgz
  * Keep the scratch tree for inspection: KEEP_PACKAGE_TEST=1
  * Break the installed copy on purpose (local hook): TEST_PACKAGE_DROP=<file>
  */
@@ -34,8 +35,18 @@ const VITE = path.join(REPO_ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const SCRATCH = path.join(os.tmpdir(), 'xatlas-wasm-package-test');
 const PACK_DIR = path.join(SCRATCH, 'pack');
+const PROVIDED_TARBALL = process.env.TEST_PACKAGE_TARBALL;
 const PROJECT = path.join(SCRATCH, 'project');
 const INSTALLED = path.join(PROJECT, 'node_modules', 'xatlas-wasm');
+const EXPECTED_FILES = [
+  'dist/index.mjs',
+  'dist/xatlas.wasm',
+  'lib/xatlas.d.ts',
+  'README.md',
+  'LICENSE',
+  'NOTICE',
+  'CHANGELOG.md',
+];
 
 function fail(message) {
   console.error(`test-package: ${message}`);
@@ -52,6 +63,35 @@ function run(command, args, options = {}) {
     stdio: options.stdio ?? 'inherit',
     env: process.env,
   });
+}
+
+function checkManifest(manifest, source) {
+  if (manifest.name !== 'xatlas-wasm') {
+    failStage(`${source} package.json name must be xatlas-wasm`);
+  }
+  if (manifest.license !== 'MIT') {
+    failStage(`${source} package.json license must be MIT`);
+  }
+  if (manifest.sideEffects !== false) {
+    failStage(`${source} package.json sideEffects must be false`);
+  }
+  const exportKeys = Object.keys(manifest.exports?.['.'] ?? {});
+  if (
+    exportKeys.length !== 2 ||
+    exportKeys[0] !== 'types' ||
+    exportKeys[1] !== 'import'
+  ) {
+    failStage(`${source} package.json exports["."] must declare types before import`);
+  }
+  if (manifest.publishConfig?.access !== 'public') {
+    failStage(`${source} package.json publishConfig.access must be public`);
+  }
+  if (manifest.engines?.node !== '>=16.0.0') {
+    failStage(`${source} package.json engines.node must be >=16.0.0`);
+  }
+  if (JSON.stringify(manifest.files) !== JSON.stringify(EXPECTED_FILES)) {
+    failStage(`${source} package.json files must list exactly ${EXPECTED_FILES.join(', ')}`);
+  }
 }
 
 // --- Preflight ------------------------------------------------------------
@@ -78,13 +118,25 @@ let stage = 'pack';
 
 try {
   // --- Pack and inspect the tarball --------------------------------------
-  run(NPM, ['pack', '--ignore-scripts', '--pack-destination', PACK_DIR]);
-  const tarball = readdirSync(PACK_DIR).find((file) => file.endsWith('.tgz'));
-  if (!tarball) failStage(`npm pack produced no tarball in ${PACK_DIR}`);
-  console.log(`test-package: packed ${tarball}`);
+  let tarballPath;
+  if (PROVIDED_TARBALL) {
+    tarballPath = path.resolve(PROVIDED_TARBALL);
+    if (!existsSync(tarballPath)) {
+      fail(`TEST_PACKAGE_TARBALL not found: ${tarballPath}`);
+    }
+    if (!tarballPath.endsWith('.tgz')) {
+      fail('TEST_PACKAGE_TARBALL must name a .tgz file');
+    }
+    console.log(`test-package: using provided tarball ${tarballPath}`);
+  } else {
+    run(NPM, ['pack', '--ignore-scripts', '--pack-destination', PACK_DIR]);
+    const tarball = readdirSync(PACK_DIR).find((file) => file.endsWith('.tgz'));
+    if (!tarball) failStage(`npm pack produced no tarball in ${PACK_DIR}`);
+    tarballPath = path.join(PACK_DIR, tarball);
+    console.log(`test-package: packed ${tarball}`);
+  }
 
   stage = 'tarball contents';
-  const tarballPath = path.join(PACK_DIR, tarball);
   const listing = execFileSync('tar', ['tzf', tarballPath], { encoding: 'utf8' })
     .split('\n')
     .map((line) => line.trim());
@@ -93,12 +145,22 @@ try {
     'package/dist/xatlas.wasm',
     'package/lib/xatlas.d.ts',
     'package/README.md',
+    'package/LICENSE',
+    'package/NOTICE',
+    'package/CHANGELOG.md',
     'package/package.json',
   ]) {
     if (!listing.includes(required)) {
       failStage(`tarball is missing ${required}`);
     }
   }
+  stage = 'tarball manifest';
+  const tarballManifest = JSON.parse(
+    execFileSync('tar', ['-xOzf', tarballPath, 'package/package.json'], {
+      encoding: 'utf8',
+    }),
+  );
+  checkManifest(tarballManifest, 'tarball');
 
   // --- Scratch install ----------------------------------------------------
   stage = 'install';
@@ -140,11 +202,24 @@ try {
 
   // --- Installed package contents -----------------------------------------
   stage = 'installed contents';
-  for (const required of ['dist/index.mjs', 'dist/xatlas.wasm', 'lib/xatlas.d.ts']) {
+  for (const required of [
+    'dist/index.mjs',
+    'dist/xatlas.wasm',
+    'lib/xatlas.d.ts',
+    'README.md',
+    'LICENSE',
+    'NOTICE',
+    'CHANGELOG.md',
+  ]) {
     if (!existsSync(path.join(INSTALLED, required))) {
       failStage(`installed package is missing ${required}`);
     }
   }
+  stage = 'installed manifest';
+  checkManifest(
+    JSON.parse(readFileSync(path.join(INSTALLED, 'package.json'), 'utf8')),
+    'installed',
+  );
 
   // --- Node consumer ------------------------------------------------------
   stage = 'node consumer';

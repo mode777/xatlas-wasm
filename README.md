@@ -94,7 +94,7 @@ const xatlasFromBytes = await createXAtlas({ wasmBinary });
 
 `wasmBinary` takes precedence over `locateFile`. Invalid option types reject
 with a `TypeError` naming the option; a missing artifact rejects with an error
-naming `xatlas.wasm`. See the [API Reference](API.md#createxatlasoptions) for
+naming `xatlas.wasm`. See the [API Reference](https://github.com/mode777/xatlas-wasm/blob/main/API.md#createxatlasoptions) for
 the full contract.
 
 ## Workers
@@ -153,6 +153,7 @@ The worker test in `test/worker-entry.mjs` follows the Node recipe.
 - **[Showcase](https://mode777.github.io/xatlas-wasm/)** — the realistic six-scenario browser gallery.
 - **[API Reference](https://github.com/mode777/xatlas-wasm/blob/main/API.md)** — types, options, enumerations and examples.
 - **[Build Guide](https://github.com/mode777/xatlas-wasm/blob/main/BUILD.md)** — compiling, testing and serving the WASM module and showcase.
+- **[Changelog](https://github.com/mode777/xatlas-wasm/blob/main/CHANGELOG.md)** — release history and user-visible changes.
 - **[Improvement Backlog](https://github.com/mode777/xatlas-wasm/blob/main/docs/improvements.md)** — WASM loading audit, comparison with libfive-wasm, and the proposed OpenSpec change sequence.
 - **[OpenSpec Project](https://github.com/mode777/xatlas-wasm/tree/main/openspec)** — project context, specs, and active change proposals.
 
@@ -180,8 +181,9 @@ project under the OS temp directory, runs a Node consumer (including
 a Vite consumer that must emit the `.wasm` asset. The scratch tree is kept on
 failure; `KEEP_PACKAGE_TEST=1` keeps it after a successful run, and
 `TEST_PACKAGE_DROP=<file>` is a maintainer-only hook for proving a deliberately
-broken package fails (not used in CI). The test still does not require a root
-`LICENSE` (XW-018).
+broken package fails (not used in CI). The test requires the packaged
+`LICENSE`, `NOTICE` and `CHANGELOG.md` alongside the WASM entry and
+declarations.
 
 CI runs the build, smoke, loader, worker and package-consumer tests on every
 push to `main` and every pull request, with Emscripten 3.1.64 and Node 24; see the
@@ -194,4 +196,6 @@ for the proposed sequence.
 
 ## License
 
-MIT — see [thirdparty/xatlas/LICENSE](https://github.com/mode777/xatlas-wasm/blob/main/thirdparty/xatlas/LICENSE) for the upstream xatlas license.
+MIT — see [LICENSE](https://github.com/mode777/xatlas-wasm/blob/main/LICENSE)
+for this package and [NOTICE](https://github.com/mode777/xatlas-wasm/blob/main/NOTICE)
+for the upstream xatlas license and copyright.

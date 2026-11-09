@@ -2,7 +2,12 @@
 
 **Status:** audit / proposal  
 **Date:** 2026-11-08  
-**Baseline:** `main` at `4bb211e` (`xatlas-wasm@0.1.3`)  
+**Baseline:** `main` at `4bb211e` (`xatlas-wasm@0.1.3`)
+
+**Current status (2026-11-09):** `package-release-polish` (XW-018, XW-019) is
+implemented on `main`; the published npm package remains `0.1.3` until the next
+version bump and release.
+
 **Reference implementation:** `mode777/libfive-wasm` at `d59d540`
 
 This document records the review of `xatlas-wasm`, the comparison with
@@ -164,6 +169,11 @@ caching, explicit override options, and worker support.
 
 ## 4. Comparison
 
+> The `xatlas-wasm` column records the audit baseline at `4bb211e`. See the
+> progress notes in §5 for work implemented since then, including the separate
+> `.wasm` artifact, loader options, license, notice, changelog and release
+> validation.
+
 | Concern | `xatlas-wasm` | `libfive-wasm` |
 |---|---|---|
 | WASM delivery | 173 KB base64 inside a 270 KB JS bundle | separate 1.05 MB `.wasm` + JS glue |
@@ -176,7 +186,7 @@ caching, explicit override options, and worker support.
 | Build | direct CMake; CI uses `emsdk: latest` | pinned Emscripten 3.1.64, vendored deps, release/debug flavors |
 | Tests | one 104-line Node smoke test, only at publish | 19 vitest suites + smoke/interval/golden/package/consumer tests |
 | CI | publish-on-release only | build/test on every push/PR + tag-gated publish |
-| Package | 4 files, no root LICENSE, no changelog | dist + LICENSE + docs; pack/type/Vite consumer test |
+| Package | baseline: 4 files without license or changelog; now 8 files with `LICENSE`, `NOTICE` and `CHANGELOG.md` | dist + LICENSE + docs; pack/type/Vite consumer test |
 
 ### What `xatlas-wasm` does better
 
@@ -228,8 +238,8 @@ vendoring machinery.
   `dist/xatlas.wasm`; the wrapper resolves the sibling with Emscripten's
   `new URL('xatlas.wasm', import.meta.url)`; and the npm tarball ships the
   `.wasm`. Node, browser/Vite and worker paths are covered by tests. The
-  license clause is deferred to XW-018, so the tarball does not yet contain a
-  root `LICENSE`.
+  license clause was closed by `package-release-polish` (2026-11-09): the
+  tarball now contains `LICENSE`, `NOTICE` and `CHANGELOG.md`.
 - **Measured after implementation (2026-11-08):** `dist/xatlas.mjs` 25,190
   bytes (6.5 KiB gzip), `dist/xatlas.wasm` 173,401 bytes (67.3 KiB gzip), and
   `dist/index.mjs` 49,938 bytes (10.8 KiB gzip). The packed tarball is 87.4 kB
@@ -521,7 +531,8 @@ vendoring machinery.
   commit, `thirdparty/xatlas` commit, digests/sizes) before `npm publish`.
   `BUILD.md` documents the 3.1.64 pin. Remaining: a committed submodule
   lock/README is deferred to XW-022; tag/version enforcement, trusted
-  publishing and a changelog to XW-019.
+  publishing and a changelog were delivered by `package-release-polish`
+  (XW-019).
 - **Suggested OpenSpec change:** `build-ci-hardening`
 
 #### XW-016 — Add a push/PR build-and-test workflow
@@ -590,6 +601,13 @@ vendoring machinery.
 - **Acceptance criteria:** `npm pack` contains the license and the documents
   the README links to; `npm publish --dry-run` reports no missing-file
   warnings; TypeScript resolution still works.
+- **Progress (2026-11-09):** implemented by `package-release-polish`. A root
+  `LICENSE` and upstream `NOTICE` ship in the tarball, `CHANGELOG.md` is
+  included, README documentation links are absolute, and `package.json` sets
+  `sideEffects: false`, declares `types` before `import` and adds
+  `publishConfig.access: "public"`. The packed-package test requires the new
+  files and asserts the manifest. `engines.node` remains `>=16.0.0`; the
+  >=18 bump was deferred.
 - **Suggested OpenSpec change:** `package-release-polish`
 
 #### XW-019 — Harden the release and publishing flow
@@ -607,6 +625,14 @@ vendoring machinery.
 - **Acceptance criteria:** a mismatched tag fails before `npm publish`; a
   published version can be installed and used from a clean project; the
   changelog and tag exist.
+- **Progress (2026-11-09):** implemented by `package-release-polish`. The
+  publish workflow resolves a release tag from the release event or a required
+  `workflow_dispatch` `tag` input, validates the annotated
+  `v<package.json version>` tag, lockfile version, changelog section and
+  published non-draft release, attaches provenance, uses OIDC trusted
+  publishing, skips an already-published version and verifies the registry
+  tarball. `BUILD.md` documents the annotated-tag release procedure. The first
+  real release through the flow remains a post-merge verification.
 - **Suggested OpenSpec change:** `package-release-polish`
 
 #### XW-020 — Add a package/type/bundler consumer test
@@ -622,22 +648,19 @@ vendoring machinery.
   XW-001 lands). Model it on `libfive-wasm/scripts/test-package.mjs`.
 - **Acceptance criteria:** the script passes locally and in CI; it fails on a
   missing `.wasm`, missing license, or a broken declaration.
-- **Progress (2026-11-08):** **partially implemented** by the
-  `build-ci-hardening` OpenSpec change. `npm run test:package` runs
-  `scripts/test-package.mjs`: it packs the real tarball, checks the required
-  `dist/index.mjs`, `lib/xatlas.d.ts`, `README.md` and `package.json` entries,
-  installs the tarball into a scratch project under `os.tmpdir()`, runs a Node
-  consumer (quad, `generate()`, `getImage()`, `destroy()`), typechecks a
-  TypeScript consumer with the repository's `typescript`, and runs a Vite
-  production build that must emit and reference a JS asset. The scratch tree
-  is removed on success and kept on failure; `KEEP_PACKAGE_TEST=1` keeps it
-  after success, and `TEST_PACKAGE_DROP=<file>` is a local negative hook (not
-  used in CI). The missing-`.wasm` acceptance check landed with
-  `wasm-loader-options`: the tarball must contain `dist/xatlas.wasm`, the Node
-  consumer resolves it, and the Vite consumer must emit it. The missing-license
-  check is deferred to XW-018: the tarball still has no root `LICENSE`.
-  Remaining sub-items: XW-018 package contents, XW-019 release flow,
-  XW-022 lock/provenance.
+- **Progress (2026-11-09):** implemented across `build-ci-hardening`,
+  `wasm-loader-options` and `package-release-polish`. `npm run test:package`
+  runs `scripts/test-package.mjs`: it packs the real tarball, checks the
+  required `dist/index.mjs`, `dist/xatlas.wasm`, `lib/xatlas.d.ts`,
+  `README.md`, `LICENSE`, `NOTICE`, `CHANGELOG.md` and `package.json` entries,
+  asserts the manifest metadata, installs the tarball into a scratch project
+  under `os.tmpdir()`, runs a Node consumer (quad, `generate()`, `getImage()`,
+  `destroy()`), typechecks a TypeScript consumer with the repository's
+  `typescript`, and runs a Vite production build that must emit and reference
+  the `.wasm` asset. The scratch tree is removed on success and kept on failure;
+  `KEEP_PACKAGE_TEST=1` keeps it after success, and `TEST_PACKAGE_DROP=<file>`
+  is a local negative hook (not used in CI). The missing-license check is now
+  closed. XW-022 lock/provenance remains a separate item.
 - **Suggested OpenSpec change:** `build-ci-hardening` (or
   `package-release-polish`)
 
@@ -806,9 +829,14 @@ follow-up. `wasm-loader-options` (XW-001–XW-005) is implemented and archived
 `wasm-loader`, `packaging` and `build-ci` specs synced). `showcase-site`
 (XW-025) is implemented out of sequence: the realistic six-scenario gallery,
 worker, four views, site tests and Pages workflow are in place, and
-the package loader/API is unchanged. XW-008 (`getImage()`) still needs its spec
-delta in `atlas-result-api`. Every other change in the table remains
-unimplemented.
+the package loader/API is unchanged. `package-release-polish` (XW-018,
+XW-019) is implemented as an OpenSpec change on `main`: the tarball carries
+`LICENSE`, `NOTICE` and `CHANGELOG.md`; the publish workflow validates the
+annotated release tag, package/lockfile versions, changelog and published
+release, uses OIDC trusted publishing, skips an already-published version and
+verifies the registry tarball. The first release through the new flow remains
+the post-merge verification. XW-008 (`getImage()`) still needs its spec delta
+in `atlas-result-api`. Every other change in the table remains unimplemented.
 
 ### Notes on ordering
 
@@ -822,8 +850,8 @@ unimplemented.
   after-free semantics.
 - `abi-hardening` is internal and should not change the public API beyond the
   export-surface cleanup.
-- `package-release-polish` should be last before a version bump; it needs the
-  loader/package layout to be final.
+- `package-release-polish` is implemented; the next version bump can use the
+  tag-gated release flow. The loader/package layout is final for this release.
 
 ---
 
@@ -859,6 +887,11 @@ every change in the sequence.
 ---
 
 ## 8. Evidence and reproduction notes
+
+> The evidence below records the pre-change baseline at `4bb211e`. The
+> `package-release-polish` change (2026-11-09) updated the package contents and
+> release flow; see §5 for the current status. In particular, the current
+> tarball includes `LICENSE`, `NOTICE` and `CHANGELOG.md`.
 
 ### Build and smoke test
 
