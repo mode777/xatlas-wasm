@@ -6,9 +6,10 @@
  *   node scripts/verify-published.mjs v0.1.3
  *   node scripts/verify-published.mjs --version 0.1.3 --tarball /path/to.tgz
  *
- * Without --tarball, the script polls `npm view` for the version, downloads the
- * registry tarball with `npm pack`, and runs `scripts/test-package.mjs` against
- * it through TEST_PACKAGE_TARBALL. With --tarball, the registry is not touched.
+ * Without --tarball, the script polls `npm view` for the version (up to five
+ * minutes by default), downloads the registry tarball with `npm pack`, and runs
+ * `scripts/test-package.mjs` against it through TEST_PACKAGE_TARBALL. With
+ * --tarball, the registry is not touched.
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -30,8 +31,8 @@ function parseArgs(argv) {
   let tag;
   let version;
   let tarball;
-  let attempts = 12;
-  let delayMs = 10000;
+  let attempts = 20;
+  let delayMs = 15000;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];

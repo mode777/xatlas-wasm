@@ -5,8 +5,9 @@
 **Baseline:** `main` at `4bb211e` (`xatlas-wasm@0.1.3`)
 
 **Current status (2026-11-09):** `package-release-polish` (XW-018, XW-019) is
-implemented on `main`; the published npm package remains `0.1.3` until the next
-version bump and release.
+implemented on `main`, and `xatlas-wasm@0.2.0` was published on 2026-11-09. The
+first tag-gated release succeeded after a retry when npm's registry processing
+exceeded the initial verification window.
 
 **Reference implementation:** `mode777/libfive-wasm` at `d59d540`
 
@@ -631,8 +632,10 @@ vendoring machinery.
   `v<package.json version>` tag, lockfile version, changelog section and
   published non-draft release, attaches provenance, uses OIDC trusted
   publishing, skips an already-published version and verifies the registry
-  tarball. `BUILD.md` documents the annotated-tag release procedure. The first
-  real release through the flow remains a post-merge verification.
+  tarball. `BUILD.md` documents the annotated-tag release procedure. The flow
+  was verified end to end with `v0.2.0` on 2026-11-09 (publish run
+  `42591526346`); the first verification attempt timed out while npm processed
+  the package, and the retry passed.
 - **Suggested OpenSpec change:** `package-release-polish`
 
 #### XW-020 — Add a package/type/bundler consumer test
@@ -834,9 +837,10 @@ XW-019) is implemented as an OpenSpec change on `main`: the tarball carries
 `LICENSE`, `NOTICE` and `CHANGELOG.md`; the publish workflow validates the
 annotated release tag, package/lockfile versions, changelog and published
 release, uses OIDC trusted publishing, skips an already-published version and
-verifies the registry tarball. The first release through the new flow remains
-the post-merge verification. XW-008 (`getImage()`) still needs its spec delta
-in `atlas-result-api`. Every other change in the table remains unimplemented.
+verifies the registry tarball. The first release through the new flow was
+verified on 2026-11-09 with `v0.2.0` (publish run `42591526346`). XW-008
+(`getImage()`) still needs its spec delta in `atlas-result-api`. Every other
+change in the table remains unimplemented.
 
 ### Notes on ordering
 
