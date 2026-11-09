@@ -6,24 +6,31 @@ context: |
   packaged as the npm module `xatlas-wasm` (ESM-only, async `createXAtlas()`,
   Flat API + TypeScript declarations, Node >= 16 and modern browsers).
   In scope: the xatlas C API wrapper, type definitions, the Emscripten/CMake
-  build, the npm package and its CI/release flow. Out of scope: changing
-  xatlas's atlas-generation algorithm, the upstream xatlas sources, or adding
-  pthreads/SharedArrayBuffer support in the current sequence.
+  build, the npm package and its CI/release flow, plus the non-published
+  showcase site under `site/`. Out of scope: changing xatlas's atlas-generation
+  algorithm, the upstream xatlas sources, or adding pthreads/SharedArrayBuffer
+  support in the current sequence.
 
-  Current baseline: xatlas-wasm@0.1.3 uses Emscripten SINGLE_FILE=1, so the
-  wasm is base64-embedded in dist/xatlas.mjs / dist/index.mjs. There are no
-  loader options, no image accessor, no lifetime safety net and no push/PR CI.
-  The detailed audit, measured evidence and prioritised improvement items live
-  in docs/improvements.md (IDs XW-001..XW-024). That document is the backlog
-  for this OpenSpec workflow; proposals must reference the IDs they implement.
+  Current baseline: `xatlas-wasm@0.1.3` ships a separate `dist/xatlas.wasm`
+  loaded on demand by `createXAtlas(options?)`; the module supports
+  `wasmBinary`, `locateFile`, `print` and `printErr`, runs in web/Node/worker
+  environments, and `getImage()` returns a copied atlas texel map. Push/PR CI
+  is active and the packed-package consumer test runs in both build workflows.
+  Mesh-input validation, lifetime safety, the bulk mesh-result API, ABI
+  hardening and release/docs provenance remain open. The detailed audit,
+  measured evidence and prioritised improvement items live in
+  docs/improvements.md (IDs XW-001..XW-025). That document is the backlog for
+  this OpenSpec workflow; proposals must reference the IDs they implement.
 
   Target direction (subject to individual change designs):
-  - separate `xatlas.wasm` with explicit `wasmBinary`/`locateFile` options,
-    browser/Node/worker support and bundler-neutral JS;
   - validated mesh inputs, idempotent object lifetimes, bounded result access
     and a bulk typed-array mesh-result API;
-  - pinned Emscripten 3.1.64, push/PR build-and-test CI, a packed-package
-    consumer test, and a tag-gated provenance release.
+  - ABI hardening and a trimmed, explicit Emscripten export surface;
+  - package contents, license and tag-gated provenance release hardening;
+  - upstream/submodule provenance and documentation that tracks the runtime;
+  - a public showcase site (`site/`) with scenario demos, worker unwrapping and
+    Pages deployment; follow-ups expand the gallery, add in-site docs and
+    captured thumbnails.
 
   Upstream xatlas is pinned as the git submodule at thirdparty/xatlas. Do not
   edit files under thirdparty/xatlas in-tree; wrapper/accessor work belongs in
@@ -37,16 +44,16 @@ context: |
 
   Workflow: all functional work is proposed, specified, implemented and
   archived as OpenSpec changes under openspec/changes/<name>/ (proposal,
-  specs, design, tasks). The first change should capture the current behaviour
-  as baseline specs. Work directly on main with concise commits; once the
-  push/PR build workflow lands, keep it green.
+  specs, design, tasks). Baseline specs exist under openspec/specs/; later
+  changes express deltas against them. Work directly on main with concise
+  commits and keep the push/PR build workflow and Pages deployment green.
 
 # Per-artifact rules
 rules:
   proposal:
     - Reference the docs/improvements.md item IDs (XW-###) the change implements; state explicitly which of loader/artifact, public API, package layout, or CI/release behaviour changes.
     - Keep the proposal scoped to one independently shippable change; list what is out of scope and any follow-up it deliberately defers.
-    - Note whether the change alters the current SINGLE_FILE/loader contract or remains compatible with it.
+    - Note whether the change alters the loader/artifact contract or remains compatible with it.
   design:
     - Ground the design in docs/improvements.md and the current loader/API implementation; cite concrete files and measured sizes where relevant.
     - Preserve the ESM-only, Node >= 16 (target >= 18), modern-browser contract and the single-threaded (XA_MULTITHREADED=0) kernel unless the change explicitly proposes otherwise.
